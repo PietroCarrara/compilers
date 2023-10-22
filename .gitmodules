@@ -1,0 +1,6 @@
+[submodule "vendor/datatype99"]
+	path = vendor/datatype99
+	url = git@github.com:Hirrolot/datatype99.git
+[submodule "vendor/metalang99"]
+	path = vendor/metalang99
+	url = git@github.com:Hirrolot/metalang99.git
