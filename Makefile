@@ -15,12 +15,12 @@ build/lex.yy.o: src/lex/lex.yy.c
 build/main.o: src/main.c
 	$(CC) $(CFLAGS) -c src/main.c -o build/main.o
 
-compiler: build/main.o build/lex.yy.o
-	$(CC) $(CFLAGS) build/lex.yy.o build/main.o -o compiler
+build/compiler: build/main.o build/lex.yy.o
+	$(CC) $(CFLAGS) build/lex.yy.o build/main.o -o build/compiler
 
 clean:
 	rm -rf build/*
 	rm src/lex/lex.yy.c
 
-run: compiler
-	./compiler
+run: build/compiler
+	./build/compiler
