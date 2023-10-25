@@ -2,7 +2,7 @@
   #include "tokenization.h"
 %}
 
-%option noyywrap
+%option noyywrap yylineno
 
 %x MULTICOMMENT
 
@@ -10,14 +10,13 @@
 
 "char"   { return TOKEN_CHAR; }
 "int"    { return TOKEN_INT; }
-"real"   { return TOKEN_REAL; }
-"bool"   { return TOKEN_BOOL; }
+"float"  { return TOKEN_FLOAT; }
+"code"   { return TOKEN_CODE; }
 "if"     { return TOKEN_IF; }
-"then"   { return TOKEN_THEN; }
 "else"   { return TOKEN_ELSE; }
-"loop"   { return TOKEN_LOOP; }
+"while"  { return TOKEN_WHILE; }
 "input"  { return TOKEN_INPUT; }
-"output" { return TOKEN_OUTPUT; }
+"print"  { return TOKEN_PRINT; }
 "return" { return TOKEN_RETURN; }
 
 "," { return TOKEN_COMMA; }
@@ -40,19 +39,23 @@
 "|" { return TOKEN_PIPE; }
 "~" { return TOKEN_TILDE; }
 
-%{/* String literal accounting for \" inside itself */%}
-\"("\\\""|[^"\n])*\" { return TOKEN_STRING_LITERAL; }
+[a-zA-Z_0-9]*[a-zA-Z_]+[a-zA-Z_0-9]* { return TOKEN_IDENTIFIER; }
 
-[1-9][0-9]          { return TOKEN_INT_LITERAL; }
-[1-9][0-9]*\.[0-9]+ { return TOKEN_REAL_LITERAL; }
-'.'                 { return TOKEN_CHAR_LITERAL; }
 
-[a-zA-Z._]+          { return TOKEN_IDENTIFIER; }
+%{/* String literal */%}
+\"[^"]*\" { return TOKEN_STRING_LITERAL; }
 
-"\\\\"[^\\].*       ;
-"\\\\\\"            { BEGIN(MULTICOMMENT); }
-<MULTICOMMENT>"///" { BEGIN(INITIAL); }
-<MULTICOMMENT>"\n"  ;
-<MULTICOMMENT>.     ;
+[1-9][0-9]*          { return TOKEN_INT_LITERAL; }
+[1-9][0-9]*\.[0-9]+  { return TOKEN_FLOAT_LITERAL; }
+'.'                  { return TOKEN_CHAR_LITERAL; }
 
-[ \t\n] ;
+
+"//"[^/].*             { /* single-line comment */ }
+"///"                  { BEGIN(MULTICOMMENT); }
+<MULTICOMMENT>"\\\\\\" { BEGIN(INITIAL); }
+<MULTICOMMENT>"\n"     ;
+<MULTICOMMENT>.        ;
+
+[ \t\n] { /* ignore whitespaces */ }
+.       { return TOKEN_ERROR; }
+
