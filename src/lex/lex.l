@@ -10,6 +10,7 @@
   int _running = 1;
   int yywrap() { _running = 0; return 1; }
   int isRunning() { return _running; }
+  int getLineNumber() { return yylineno; }
 %}
 
 %option yylineno

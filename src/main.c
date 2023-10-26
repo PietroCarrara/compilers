@@ -28,7 +28,6 @@ int main(int argc, char** argv) {
   while (token != 0) {
     token = yylex();
   }
-  printf("EOF\n");
 
   foreach_symbol(print_symbol);
 }
