@@ -3,9 +3,16 @@
   #include "tokenization.h"
 
   #include <string.h>
+
+  // Code required by the professor
+  // TODO: Delete
+  void initMe() { }
+  int _running = 1;
+  int yywrap() { _running = 0; return 1; }
+  int isRunning() { return _running; }
 %}
 
-%option noyywrap yylineno
+%option yylineno
 
 %x MULTICOMMENT
 
