@@ -14,6 +14,7 @@ main() {
 		mv "$i" "release/$fname"
 		fix_includes "release/$fname"
 	done
+	rm -rf release/include
 
 	cat <<EOF >release/Makefile
 default: build
