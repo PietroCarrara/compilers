@@ -1,5 +1,8 @@
 %{
+  #include "symbols.h"
   #include "tokenization.h"
+
+  #include <string.h>
 %}
 
 %option noyywrap yylineno
@@ -39,16 +42,41 @@
 "|" { return TOKEN_PIPE; }
 "~" { return TOKEN_TILDE; }
 
-[a-zA-Z_0-9]*[a-zA-Z_]+[a-zA-Z_0-9]* { return TOKEN_IDENTIFIER; }
-
-
-%{/* String literal */%}
-\"[^"]*\" { return TOKEN_STRING_LITERAL; }
-
-[1-9][0-9]*          { return TOKEN_INT_LITERAL; }
-[1-9][0-9]*\.[0-9]+  { return TOKEN_FLOAT_LITERAL; }
-'.'                  { return TOKEN_CHAR_LITERAL; }
-
+[a-zA-Z_0-9]*[a-zA-Z_]+[a-zA-Z_0-9]* {
+  register_symbol((SymbolData){
+    .name = strdup(yytext),
+    .symbol = IdentifierLiteral(strdup(yytext))
+  });
+  return TOKEN_IDENTIFIER;
+}
+\"[^"]*\" {
+  register_symbol((SymbolData){
+    .name = strdup(yytext),
+    .symbol = StringLiteral(strdup(yytext))
+  });
+  return TOKEN_STRING_LITERAL;
+}
+[1-9][0-9]* {
+  register_symbol((SymbolData){
+    .name = strdup(yytext),
+    .symbol = IntLiteral(atoi(yytext))
+  });
+  return TOKEN_INT_LITERAL;
+}
+[1-9][0-9]*\.[0-9]+ {
+  register_symbol((SymbolData){
+    .name = strdup(yytext),
+    .symbol = FloatLiteral(atof(yytext))
+  });
+  return TOKEN_FLOAT_LITERAL;
+}
+'.' {
+  register_symbol((SymbolData){
+    .name = strdup(yytext),
+    .symbol = CharLiteral(yytext[1])
+  });
+  return TOKEN_CHAR_LITERAL;
+}
 
 "//"[^/].*             { /* single-line comment */ }
 "///"                  { BEGIN(MULTICOMMENT); }
