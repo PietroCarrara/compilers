@@ -63,14 +63,14 @@
   });
   return TOKEN_STRING_LITERAL;
 }
-[1-9][0-9]* {
+[0-9]+ {
   register_symbol((SymbolData){
     .name = strdup(yytext),
     .symbol = IntLiteral(atoi(yytext))
   });
   return TOKEN_INT_LITERAL;
 }
-[1-9][0-9]*\.[0-9]+ {
+[0-9]+\.[0-9]+ {
   register_symbol((SymbolData){
     .name = strdup(yytext),
     .symbol = FloatLiteral(atof(yytext))
