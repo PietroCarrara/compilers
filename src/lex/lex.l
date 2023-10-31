@@ -50,6 +50,11 @@
 "|" { return TOKEN_PIPE; }
 "~" { return TOKEN_TILDE; }
 
+"<=" { return TOKEN_LESS_EQUAL; }
+">=" { return TOKEN_GREATER_EQUAL; }
+"==" { return TOKEN_DOUBLE_EQUALS; }
+"!=" { return TOKEN_NOT_EQUALS; }
+
 [a-zA-Z_0-9]*[a-zA-Z_]+[a-zA-Z_0-9]* {
   register_symbol((SymbolData){
     .name = strdup(yytext),
@@ -57,7 +62,8 @@
   });
   return TOKEN_IDENTIFIER;
 }
-\"[^"]*\" {
+%{/* String literal accounting for \" inside itself */%}
+\"("\\\""|[^"\n])*\" {
   register_symbol((SymbolData){
     .name = strdup(yytext),
     .symbol = StringLiteral(strdup(yytext))
@@ -93,5 +99,5 @@
 <MULTICOMMENT>.        ;
 
 [ \t\n] { /* ignore whitespaces */ }
-.       { return TOKEN_ERROR; }
+.       { printf("error: unknown token \"%s\"\n", yytext); return TOKEN_ERROR; }
 

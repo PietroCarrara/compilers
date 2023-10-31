@@ -1,5 +1,6 @@
 #!/bin/sh
 shopt -s globstar
+OUT=etapa1
 
 main() {
 	mkdir -p release/
@@ -8,7 +9,7 @@ main() {
 	cp build/_deps/datatype99-src/datatype99.h release/
 	cp -r build/_deps/metalang99-src/include release/
 
-	# Flatten the structure, because the professor said so
+	# Flatten the structure, because the professor said so (???)
 	for i in ./release/include/**/*.h; do
 		fname=$(echo "${i#./release/include/}" | tr \/ _)
 		mv "$i" "release/$fname"
@@ -21,12 +22,16 @@ default: build
 
 build:
 	flex lex.l
-	gcc -I. *.c -o etapa1
+	gcc -I. *.c -o $OUT
 
 clean:
-	rm etapa1
+	rm $OUT
 	rm lex.yy.c
 EOF
+
+	cd release
+	tar cvzf ../$OUT.tgz .
+	cd ..
 }
 
 fix_includes() {
