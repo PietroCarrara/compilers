@@ -27,5 +27,5 @@ endif()
 
 add_subdirectory(src)
 
-target_link_libraries(compilerProject datatype99 lex symbols)
+target_link_libraries(compilerProject datatype99 yacc symbols)
 target_include_directories(compilerProject PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/lex/symbols)

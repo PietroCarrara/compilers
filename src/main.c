@@ -2,9 +2,9 @@
 
 #include <stdio.h>
 
-extern int yylex();
-extern char* yytext;
+extern int yyparse(void);
 extern FILE* yyin;
+extern int yylineno;
 
 static void print_symbol(SymbolData* data) {
   match(data->symbol) {
@@ -24,9 +24,9 @@ int main(int argc, char** argv) {
 
   yyin = fopen(argv[1], "r");
 
-  int token = yylex();
-  while (token != 0) {
-    token = yylex();
+  // Check for error
+  if (yyparse()) {
+    printf("error: invalid syntax at file %s:%d\n", argv[1], yylineno);
   }
 
   foreach_symbol(print_symbol);

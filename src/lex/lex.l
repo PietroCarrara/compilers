@@ -1,6 +1,6 @@
 %{
   #include "symbols.h"
-  #include "tokenization.h"
+  #include "y.tab.h"
 
   #include <string.h>
 
@@ -30,25 +30,7 @@
 "print"  { return TOKEN_PRINT; }
 "return" { return TOKEN_RETURN; }
 
-"," { return TOKEN_COMMA; }
-";" { return TOKEN_SEMICOLON; }
-"(" { return TOKEN_OPEN_PAREN; }
-")" { return TOKEN_CLOSE_PAREN; }
-"[" { return TOKEN_OPEN_BRACKET; }
-"]" { return TOKEN_CLOSE_BRACKET; }
-"{" { return TOKEN_OPEN_BRACE; }
-"}" { return TOKEN_CLOSE_BRACE; }
-"=" { return TOKEN_EQUAL; }
-"+" { return TOKEN_PLUS; }
-"-" { return TOKEN_MINUS; }
-"*" { return TOKEN_ASTERISK; }
-"/" { return TOKEN_SLASH; }
-"%" { return TOKEN_PERCENT; }
-"<" { return TOKEN_LESS; }
-">" { return TOKEN_GREATER; }
-"&" { return TOKEN_AMPERSAND; }
-"|" { return TOKEN_PIPE; }
-"~" { return TOKEN_TILDE; }
+[-+*/%,;()\[\]{}=<>&|~] { return yytext[0]; }
 
 "<=" { return TOKEN_LESS_EQUAL; }
 ">=" { return TOKEN_GREATER_EQUAL; }
@@ -101,3 +83,8 @@
 [ \t\n] { /* ignore whitespaces */ }
 .       { printf("error: unknown token \"%s\"\n", yytext); return TOKEN_ERROR; }
 
+%%
+
+void yyerror(char const *s) {
+  fprintf(stderr, "error: %s\n", s);
+}
