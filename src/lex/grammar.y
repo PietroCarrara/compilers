@@ -22,7 +22,12 @@
 %token TOKEN_FLOAT_LITERAL
 %token TOKEN_CHAR_LITERAL
 %token TOKEN_STRING_LITERAL
-%token TOKEN_ERROR
+%token TOKEN_ERROR /* TODO: Delete */
+
+%left '&' '|' '~'
+%left '<' '>' TOKEN_LESS_EQUAL TOKEN_GREATER_EQUAL TOKEN_DOUBLE_EQUALS TOKEN_NOT_EQUALS
+%left '+' '-'
+%left '*' '/'
 
 %%
 
@@ -53,32 +58,39 @@ implementations: implementation implementations
 
 implementation: TOKEN_CODE TOKEN_IDENTIFIER command
 
-command: simple_command ';'
-       | block_command
+command: TOKEN_IDENTIFIER '=' expression ';'
+       | TOKEN_IDENTIFIER '[' expression ']' '=' expression ';'
+       | TOKEN_PRINT expression ';'
+       | TOKEN_RETURN expression ';'
+       | TOKEN_IF '(' expression ')' command
+       | TOKEN_IF '(' expression ')' command TOKEN_ELSE command
+       | TOKEN_WHILE '(' expression ')' command
+       | '{' command_sequence '}'
+       | ';' /* Empty command */
        ;
 
 command_sequence: command command_sequence
                 |
                 ;
 
-block_command: '{' command_sequence '}'
-
-
-simple_command: TOKEN_IDENTIFIER '=' expression
-              | TOKEN_IDENTIFIER '[' expression ']' '=' expression
-              | TOKEN_IF '(' expression ')' command
-              | TOKEN_IF '(' expression ')' command TOKEN_ELSE command
-              | TOKEN_WHILE '(' expression ')' command
-              | TOKEN_PRINT expression
-              | TOKEN_RETURN expression
-              |
-              ;
-
 expression: literal
           | TOKEN_IDENTIFIER
           | TOKEN_IDENTIFIER '[' expression ']'
           | TOKEN_IDENTIFIER '(' argument_list ')'
           | TOKEN_INPUT '(' type ')'
+          | expression '+' expression
+          | expression '-' expression
+          | expression '*' expression
+          | expression '/' expression
+          | expression '<' expression
+          | expression '>' expression
+          | expression '&' expression
+          | expression '|' expression
+          | expression '~' expression
+          | expression TOKEN_LESS_EQUAL expression
+          | expression TOKEN_GREATER_EQUAL expression
+          | expression TOKEN_DOUBLE_EQUALS expression
+          | expression TOKEN_NOT_EQUALS expression
           ;
 
 argument_list:

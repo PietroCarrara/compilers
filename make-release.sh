@@ -1,11 +1,11 @@
 #!/bin/sh
 shopt -s globstar
-OUT=etapa1
+OUT=etapa2
 
 main() {
 	mkdir -p release/
 	rm -rf release/*
-	cp src/**/*.c src/**/*.h src/**/*.l release/
+	cp src/**/*.c src/**/*.h src/**/*.l src/**/*.y release/
 	cp build/_deps/datatype99-src/datatype99.h release/
 	cp -r build/_deps/metalang99-src/include release/
 
@@ -22,10 +22,12 @@ default: build
 
 build:
 	flex lex.l
+	yacc -d grammar.y
 	gcc -I. *.c -o $OUT
 
 clean:
 	rm $OUT
+	rm y.tab.c y.tab.h
 	rm lex.yy.c
 EOF
 
