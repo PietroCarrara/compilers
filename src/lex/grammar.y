@@ -1,4 +1,6 @@
 %{
+  #include "syntax-tree.h"
+       
   int yylex(void);
   int yyerror(char* s);
 %}
@@ -28,6 +30,10 @@
 %left '<' '>' TOKEN_LESS_EQUAL TOKEN_GREATER_EQUAL TOKEN_DOUBLE_EQUALS TOKEN_NOT_EQUALS
 %left '+' '-'
 %left '*' '/'
+
+%union {
+       struct StatementList* statement;
+};
 
 %%
 
