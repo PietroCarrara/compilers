@@ -8,11 +8,21 @@
 
 %union {
        Program program;
+
        DeclarationList* declarationList;
-       ImplementationList* implementationList;
        Declaration declaration;
        ParametersDeclaration* parametersDeclaration;
        ArrayInitialization* arrayInitialization;
+
+       Implementation implementation;
+       ImplementationList* implementationList;
+
+       Statement statement;
+       StatementList *statementList;
+
+       Expression expression;
+       ArgumentList* argumentList;
+
        Type type;
        Identifier identifier;
        Literal literal;
@@ -64,6 +74,15 @@
 %type <arrayInitialization> array_item_list
 
 %type <implementationList> implementations
+%type <implementation> implementation
+
+%type <statement> command;
+%type <statementList> command_sequence;
+
+%type <expression> expression;
+
+%type <argumentList> argument_list
+%type <argumentList> non_empty_argument_list
 
 %%
 
@@ -88,54 +107,54 @@ array_declaration: type TOKEN_IDENTIFIER '[' TOKEN_INT_LITERAL ']' ';'          
                  | type TOKEN_IDENTIFIER '[' TOKEN_INT_LITERAL ']' array_item_list ';' { $$ = ArrayDeclaration($1, $2, $4, $6); }
                  ;
 
-implementations: implementation implementations
-               |
+implementations: implementation implementations { $$ = make_implementation_list($1); $$->next = $2; }
+               |                                { $$ = NULL; }
                ;
 
-implementation: TOKEN_CODE TOKEN_IDENTIFIER command
+implementation: TOKEN_CODE TOKEN_IDENTIFIER command { $$ = (Implementation){ .name = $2, .body = $3 }; }
 
-command: TOKEN_IDENTIFIER '=' expression ';'
-       | TOKEN_IDENTIFIER '[' expression ']' '=' expression ';'
-       | TOKEN_PRINT expression ';'
-       | TOKEN_RETURN expression ';'
-       | TOKEN_IF '(' expression ')' command
-       | TOKEN_IF '(' expression ')' command TOKEN_ELSE command
-       | TOKEN_WHILE '(' expression ')' command
-       | '{' command_sequence '}'
-       | ';' /* Empty command */
+command: TOKEN_IDENTIFIER '=' expression ';'                    { $$ = AssignmentStatement($1, $3); }
+       | TOKEN_IDENTIFIER '[' expression ']' '=' expression ';' { $$ = ArrayAssignmentStatement($1, $3, $6); }
+       | TOKEN_PRINT expression ';'                             { $$ = PrintStatement($2); }
+       | TOKEN_RETURN expression ';'                            { $$ = ReturnStatement($2); }
+       | TOKEN_IF '(' expression ')' command                    { $$ = IfStatement($3, make_statement($5)); }
+       | TOKEN_IF '(' expression ')' command TOKEN_ELSE command { $$ = IfElseStatement($3, make_statement($5), make_statement($7)); }
+       | TOKEN_WHILE '(' expression ')' command                 { $$ = WhileStatement($3, make_statement($5)); }
+       | '{' command_sequence '}'                               { $$ = BlockStatement($2); }
+       | ';' /* Empty command */                                { $$ = EmptyStatement(); }
        ;
 
-command_sequence: command command_sequence
-                |
+command_sequence: command command_sequence { $$ = make_statement_list($1); $$->next = $2; }
+                |                          { $$ = NULL; }
                 ;
 
-expression: literal
-          | TOKEN_IDENTIFIER
-          | TOKEN_IDENTIFIER '[' expression ']'
-          | TOKEN_IDENTIFIER '(' argument_list ')'
-          | TOKEN_INPUT '(' type ')'
-          | expression '+' expression
-          | expression '-' expression
-          | expression '*' expression
-          | expression '/' expression
-          | expression '<' expression
-          | expression '>' expression
-          | expression '&' expression
-          | expression '|' expression
-          | expression '~' expression
-          | expression TOKEN_LESS_EQUAL expression
-          | expression TOKEN_GREATER_EQUAL expression
-          | expression TOKEN_DOUBLE_EQUALS expression
-          | expression TOKEN_NOT_EQUALS expression
-          | '(' expression ')'
+expression: literal                                   { $$ = LiteralExpression($1); }
+          | TOKEN_IDENTIFIER                          { $$ = IdentifierExpression($1); }
+          | TOKEN_IDENTIFIER '[' expression ']'       { $$ = ReadArrayExpression($1, make_expression($3)); }
+          | TOKEN_IDENTIFIER '(' argument_list ')'    { $$ = FunctionCallExpression($1, $3); }
+          | TOKEN_INPUT '(' type ')'                  { $$ = InputExpression($3); }
+          | expression '+' expression                 { $$ = BinaryExpression(SumOperator(), make_expression($1), make_expression($3)); }
+          | expression '-' expression                 { $$ = BinaryExpression(SubtractionOperator(), make_expression($1), make_expression($3)); }
+          | expression '*' expression                 { $$ = BinaryExpression(MultiplicationOperator(), make_expression($1), make_expression($3)); }
+          | expression '/' expression                 { $$ = BinaryExpression(DivisionOperator(), make_expression($1), make_expression($3)); }
+          | expression '<' expression                 { $$ = BinaryExpression(LessThanOperator(), make_expression($1), make_expression($3)); }
+          | expression '>' expression                 { $$ = BinaryExpression(GreaterThanOperator(), make_expression($1), make_expression($3)); }
+          | expression '&' expression                 { $$ = BinaryExpression(AndOperator(), make_expression($1), make_expression($3)); }
+          | expression '|' expression                 { $$ = BinaryExpression(OrOperator(), make_expression($1), make_expression($3)); }
+          | expression '~' expression                 { $$ = BinaryExpression(NotOperator(), make_expression($1), make_expression($3)); }
+          | expression TOKEN_LESS_EQUAL expression    { $$ = BinaryExpression(LessOrEqualOperator(), make_expression($1), make_expression($3)); }
+          | expression TOKEN_GREATER_EQUAL expression { $$ = BinaryExpression(GreaterOrEqualOperator(), make_expression($1), make_expression($3)); }
+          | expression TOKEN_DOUBLE_EQUALS expression { $$ = BinaryExpression(EqualsOperator(), make_expression($1), make_expression($3)); }
+          | expression TOKEN_NOT_EQUALS expression    { $$ = BinaryExpression(DiffersOperator(), make_expression($1), make_expression($3)); }
+          | '(' expression ')'                        { $$ = $2; }
           ;
 
 argument_list: non_empty_argument_list
-             |
+             |                          { $$ = NULL; }
              ;
 
-non_empty_argument_list: expression ',' non_empty_argument_list
-                       | expression
+non_empty_argument_list: expression ',' non_empty_argument_list { $$ = make_argument_list($1); $$->next = $3; }
+                       | expression                             { $$ = make_argument_list($1); }
                        ;
 
 type: TOKEN_CHAR  { $$ = CharType(); }
