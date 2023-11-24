@@ -13,4 +13,6 @@ target_include_directories(lex PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRE
 target_link_libraries(lex symbols yacc)
 
 target_include_directories(yacc PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/syntax-tree)
+target_include_directories(lex PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/syntax-tree)
 target_link_libraries(yacc lex syntax-tree)
+target_link_libraries(lex yacc syntax-tree)

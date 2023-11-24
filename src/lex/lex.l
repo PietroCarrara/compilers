@@ -1,5 +1,5 @@
 %{
-  #include "symbols.h"
+  #include "syntax-tree.h"
   #include "y.tab.h"
 
   #include <string.h>
