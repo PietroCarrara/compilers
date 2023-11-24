@@ -37,42 +37,11 @@
 "==" { return TOKEN_DOUBLE_EQUALS; }
 "!=" { return TOKEN_NOT_EQUALS; }
 
-[a-zA-Z_0-9]*[a-zA-Z_]+[a-zA-Z_0-9]* {
-  register_symbol((SymbolData){
-    .name = strdup(yytext),
-    .symbol = IdentifierLiteral(strdup(yytext))
-  });
-  return TOKEN_IDENTIFIER;
-}
-%{/* String literal accounting for \" inside itself */%}
-\"("\\\""|[^"\n])*\" {
-  register_symbol((SymbolData){
-    .name = strdup(yytext),
-    .symbol = StringLiteral(strdup(yytext))
-  });
-  return TOKEN_STRING_LITERAL;
-}
-[0-9]+ {
-  register_symbol((SymbolData){
-    .name = strdup(yytext),
-    .symbol = IntLiteral(atoi(yytext))
-  });
-  return TOKEN_INT_LITERAL;
-}
-[0-9]+\.[0-9]+ {
-  register_symbol((SymbolData){
-    .name = strdup(yytext),
-    .symbol = FloatLiteral(atof(yytext))
-  });
-  return TOKEN_FLOAT_LITERAL;
-}
-'.' {
-  register_symbol((SymbolData){
-    .name = strdup(yytext),
-    .symbol = CharLiteral(yytext[1])
-  });
-  return TOKEN_CHAR_LITERAL;
-}
+[a-zA-Z_0-9]*[a-zA-Z_]+[a-zA-Z_0-9]* { return TOKEN_IDENTIFIER; }
+\"("\\\""|[^"\n])*\"                 { return TOKEN_STRING_LITERAL; }
+[0-9]+                               { return TOKEN_INT_LITERAL; }
+[0-9]+\.[0-9]+                       { return TOKEN_FLOAT_LITERAL; }
+'.'                                  { return TOKEN_CHAR_LITERAL; }
 
 "//"[^/].*             { /* single-line comment */ }
 "///"                  { BEGIN(MULTICOMMENT); }
@@ -81,7 +50,6 @@
 <MULTICOMMENT>.        ;
 
 [ \t\n] { /* ignore whitespaces */ }
-.       { printf("error: unknown token \"%s\"\n", yytext); return TOKEN_ERROR; }
 
 %%
 
