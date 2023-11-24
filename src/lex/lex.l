@@ -37,11 +37,11 @@
 "==" { return TOKEN_DOUBLE_EQUALS; }
 "!=" { return TOKEN_NOT_EQUALS; }
 
-[a-zA-Z_0-9]*[a-zA-Z_]+[a-zA-Z_0-9]* { return TOKEN_IDENTIFIER; }
-\"("\\\""|[^"\n])*\"                 { return TOKEN_STRING_LITERAL; }
-[0-9]+                               { return TOKEN_INT_LITERAL; }
-[0-9]+\.[0-9]+                       { return TOKEN_FLOAT_LITERAL; }
-'.'                                  { return TOKEN_CHAR_LITERAL; }
+[a-zA-Z_0-9]*[a-zA-Z_]+[a-zA-Z_0-9]* { yylval.identifier = strdup(yytext); return TOKEN_IDENTIFIER; }
+\"("\\\""|[^"\n])*\"                 { yylval.string_val = strdup(yytext); return TOKEN_STRING_LITERAL; }
+[0-9]+                               { yylval.int_val = atoi(yytext); return TOKEN_INT_LITERAL; }
+[0-9]+\.[0-9]+                       { yylval.float_val = atof(yytext); return TOKEN_FLOAT_LITERAL; }
+'.'                                  { yylval.char_val = yytext[1]; return TOKEN_CHAR_LITERAL; }
 
 "//"[^/].*             { /* single-line comment */ }
 "///"                  { BEGIN(MULTICOMMENT); }

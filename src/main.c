@@ -1,3 +1,7 @@
+#include "format.h"
+#include "syntax-tree.h"
+#include "y.tab.h"
+
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
@@ -22,6 +26,8 @@ int main(int argc, char** argv) {
     printf("error: invalid syntax at file %s:%d\n", argv[1], yylineno);
     return 3;
   }
+
+  print_program(stdout, yylval.program);
 
   return 0;
 }
