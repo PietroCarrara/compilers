@@ -4,6 +4,8 @@
 
   int yylex(void);
   int yyerror(char* s);
+
+  extern Program yyprogram;
 %}
 
 %union {
@@ -86,7 +88,7 @@
 
 %%
 
-program: declarations implementations { $$ = (Program){ .declarations = $1, .implementations = $2 }; }
+program: declarations implementations { $$ = (Program){ .declarations = $1, .implementations = $2 }; yyprogram = $$; }
 
 declarations: declaration declarations { $$ = make_declaration($1); $$->next = $2; }
             |                          { $$ = NULL; }
@@ -173,7 +175,7 @@ parameters_declaration: non_empty_parameters_declaration
               ;
 
 non_empty_parameters_declaration: type TOKEN_IDENTIFIER ',' non_empty_parameters_declaration { $$ = make_parameters_declaration($1, $2); $$->next = $4; }
-                                | type TOKEN_IDENTIFIER                                      { $$ = NULL; }
+                                | type TOKEN_IDENTIFIER                                      { $$ = make_parameters_declaration($1, $2); }
                                 ;
 
 array_item_list: literal array_item_list { $$ = make_array_initialization($1); $$->next = $2; }

@@ -10,6 +10,8 @@ extern int yyparse(void);
 extern FILE* yyin;
 extern int yylineno;
 
+Program yyprogram;
+
 int main(int argc, char** argv) {
   if (argc < 2) {
     return 1;
@@ -27,7 +29,7 @@ int main(int argc, char** argv) {
     return 3;
   }
 
-  print_program(stdout, yylval.program);
+  print_program(stdout, yyprogram);
 
   return 0;
 }
