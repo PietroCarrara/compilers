@@ -97,10 +97,11 @@ expression: literal
           | expression TOKEN_GREATER_EQUAL expression
           | expression TOKEN_DOUBLE_EQUALS expression
           | expression TOKEN_NOT_EQUALS expression
+          | '(' expression ')'
           ;
 
-argument_list:
-             | non_empty_argument_list
+argument_list: non_empty_argument_list
+             |
              ;
 
 non_empty_argument_list: expression ',' non_empty_argument_list
@@ -118,10 +119,13 @@ literal: TOKEN_INT_LITERAL
        | TOKEN_STRING_LITERAL
        ;
 
-parameter_list: type TOKEN_IDENTIFIER ',' parameter_list
-              | type TOKEN_IDENTIFIER
+parameter_list: non_empty_parameter_list
               |
               ;
+
+non_empty_parameter_list: type TOKEN_IDENTIFIER ',' non_empty_parameter_list
+                        | type TOKEN_IDENTIFIER
+                        ;
 
 array_item_list: literal array_item_list
                | literal
