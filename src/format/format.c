@@ -1,12 +1,15 @@
 #include "format.h"
 
-#define space() fprintf(out, " ")
-#define character(c)  fprintf(out, "%c", c)
-#define string(s)  fprintf(out, "%s", s)
-#define integer(i) fprintf(out, "%d", i)
+#define TAB_SIZE 2
+
+#define space()      fprintf(out, " ")
+#define tabs(n)      fprintf(out, "%*s", (n)*TAB_SIZE, "")
+#define character(c) fprintf(out, "%c", c)
+#define string(s)    fprintf(out, "%s", s)
+#define integer(i)   fprintf(out, "%d", i)
 
 void print_literal(FILE* out, Literal literal) {
-  match (literal) {
+  match(literal) {
     of(IntLiteral, i) fprintf(out, "%d", *i);
     of(FloatLiteral, f) fprintf(out, "%g", *f);
     of(CharLiteral, c) fprintf(out, "'%c'", *c);
@@ -14,15 +17,86 @@ void print_literal(FILE* out, Literal literal) {
   }
 }
 
-void print_identifier(FILE* out, Identifier identifier) {
-  string(identifier);
-}
+void print_identifier(FILE* out, Identifier identifier) { string(identifier); }
 
 void print_type(FILE* out, Type type) {
   match(type) {
     of(IntegerType) string("int");
     of(FloatType) string("float");
     of(CharType) string("char");
+  }
+}
+
+void print_expression(FILE* out, Expression expression) { }
+
+void print_statement(FILE* out, Statement statement, int level);
+
+void print_block_statement(FILE* out, StatementList* body, int level) {
+  if (body == NULL) {
+    string("{ }");
+    return;
+  }
+
+  string("{\n");
+  while (body != NULL) {
+    tabs(level + 1);
+    print_statement(out, body->statement, level + 1);
+    character('\n');
+    body = body->next;
+  }
+  tabs(level);
+  string("}");
+}
+
+void print_statement(FILE* out, Statement statement, int level) {
+  match(statement) {
+    of(AssignmentStatement, name, expr) {
+      print_identifier(out, *name);
+      string(" = ");
+      print_expression(out, *expr);
+      character(';');
+    }
+    of(ArrayAssignmentStatement, name, index, value) {
+      print_identifier(out, *name);
+      character('[');
+      print_expression(out, *index);
+      character(']');
+      string(" = ");
+      print_expression(out, *value);
+      character(';');
+    }
+    of(PrintStatement, expr) {
+      string("print ");
+      print_expression(out, *expr);
+      string(";");
+    }
+    of(ReturnStatement, expr) {
+      string("return ");
+      print_expression(out, *expr);
+      character(";");
+    }
+    of(IfStatement, condition, body) {
+      string("if (");
+      print_expression(out, *condition);
+      string(") ");
+      print_statement(out, **body, level);
+    }
+    of(IfElseStatement, condition, true_body, false_body) {
+      string("if (");
+      print_expression(out, *condition);
+      string(") ");
+      print_statement(out, **true_body, level);
+      string(" else ");
+      print_statement(out, **false_body, level);
+    }
+    of(WhileStatement, condition, body) {
+      string("while (");
+      print_expression(out, *condition);
+      string(") ");
+      print_statement(out, **body, level);
+    }
+    of(BlockStatement, body) print_block_statement(out, *body, level);
+    of(EmptyStatement) { }
   }
 }
 
@@ -92,13 +166,27 @@ void print_declarations(FILE* out, DeclarationList* declarations) {
 
   match(declarations->declaration) {
     of(VariableDeclaration, type, identifier, literal) print_variable_declaration(out, *type, *identifier, *literal);
-    of(FunctionDeclaration, type, identifier, parameters) print_function_declaration(out, *type, *identifier, *parameters);
-    of(ArrayDeclaration, type, identifier, size, values) print_array_declaration(out, *type, *identifier, *size, *values);
+    of(FunctionDeclaration, type, identifier, parameters)
+        print_function_declaration(out, *type, *identifier, *parameters);
+    of(ArrayDeclaration, type, identifier, size, values)
+        print_array_declaration(out, *type, *identifier, *size, *values);
   }
 
   print_declarations(out, declarations->next);
 }
 
+void print_implementations(FILE* out, ImplementationList* implementations) {
+  if (implementations == NULL) {
+    return;
+  }
+
+  string("code ");
+  print_identifier(out, implementations->implementation.name);
+  space();
+  print_statement(out, implementations->implementation.body, 0);
+}
+
 void print_program(FILE* out, Program program) {
   print_declarations(out, program.declarations);
+  print_implementations(out, program.implementations);
 }
