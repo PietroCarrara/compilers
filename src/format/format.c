@@ -27,7 +27,67 @@ void print_type(FILE* out, Type type) {
   }
 }
 
-void print_expression(FILE* out, Expression expression) { }
+void print_operator(FILE* out, BinaryOperator operator) {
+  match (operator) {
+    of (SumOperator) string("+");
+    of (SubtractionOperator) string("-");
+    of (MultiplicationOperator) string("*");
+    of (DivisionOperator) string("/");
+    of (LessThanOperator) string("<");
+    of (GreaterThanOperator) string(">");
+    of (AndOperator) string("&");
+    of (OrOperator) string("|");
+    of (NotOperator) string("~");
+    of (LessOrEqualOperator) string("<=");
+    of (GreaterOrEqualOperator) string(">=");
+    of (EqualsOperator) string("==");
+    of (DiffersOperator) string("!=");
+  }
+}
+
+void print_expression(FILE* out, Expression expression);
+void print_argument_list(FILE* out, ArgumentList* arguments) {
+  if (arguments == NULL) {
+    return;
+  }
+
+  print_expression(out, arguments->argument);
+  if (arguments->next != NULL) {
+    string(", ");
+    print_argument_list(out, arguments->next);
+  }
+}
+
+void print_expression(FILE* out, Expression expression) {
+  match(expression) {
+    of(LiteralExpression, lit) print_literal(out, *lit);
+    of(IdentifierExpression, name) print_identifier(out, *name);
+    of(ReadArrayExpression, name, index) {
+      print_identifier(out, *name);
+      character('[');
+      print_expression(out, **index);
+      character(']');
+    }
+    of(FunctionCallExpression, name, argument_list) {
+      print_identifier(out, *name);
+      character('(');
+      print_argument_list(out, *argument_list);
+      character(')');
+    }
+    of(InputExpression, type) {
+      string("input(");
+      print_type(out, *type);
+      character(')');
+    }
+    of(BinaryExpression, operator, left, right) {
+      print_expression(out, **left);
+      space();
+      print_operator(out, *operator);
+      space();
+      print_expression(out, **right);
+    }
+  }
+}
 
 void print_statement(FILE* out, Statement statement, int level);
 
