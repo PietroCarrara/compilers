@@ -13,7 +13,7 @@ void print_literal(FILE* out, Literal literal) {
     of(IntLiteral, i) fprintf(out, "%d", *i);
     of(FloatLiteral, f) fprintf(out, "%g", *f);
     of(CharLiteral, c) fprintf(out, "'%c'", *c);
-    of(StringLiteral, s) fprintf(out, "\"%s\"", *s); // TODO: Fix string extra quotes
+    of(StringLiteral, s) fprintf(out, "\"%s\"", *s);
   }
 }
 
