@@ -46,6 +46,50 @@ void print_operator(FILE* out, BinaryOperator operator) {
 }
 
 void print_expression(FILE* out, Expression expression);
+
+// TODO: Tears come out of my eyes everytime I look at this horrible code
+void print_operation_with_precedence(FILE* out, BinaryOperator operator, Expression left, Expression right) {
+  int is_high_precedence = MATCHES(operator, MultiplicationOperator) || MATCHES(operator, DivisionOperator);
+
+  char* left_prefix = "";
+  char* left_postfix = "";
+  if (is_high_precedence) {
+    match (left) {
+      of(BinaryExpression, left_operator) {
+        if (MATCHES(*left_operator, SumOperator) || MATCHES(*left_operator, SubtractionOperator)) {
+          left_prefix = "(";
+          left_postfix = ")";
+        }
+      }
+      otherwise {}
+    }
+  }
+  string(left_prefix);
+  print_expression(out, left);
+  string(left_postfix);
+
+  space();
+  print_operator(out, operator);
+  space();
+
+  char* right_prefix = "";
+  char* right_postfix = "";
+  if (is_high_precedence) {
+    match (right) {
+      of(BinaryExpression, right_operator) {
+        if (MATCHES(*right_operator, SumOperator) || MATCHES(*right_operator, SubtractionOperator)) {
+          right_prefix = "(";
+          right_postfix = ")";
+        }
+      }
+      otherwise {}
+    }
+  }
+  string(right_prefix);
+  print_expression(out, right);
+  string(right_postfix);
+}
+
 void print_argument_list(FILE* out, ArgumentList* arguments) {
   if (arguments == NULL) {
     return;
@@ -79,13 +123,7 @@ void print_expression(FILE* out, Expression expression) {
       print_type(out, *type);
       character(')');
     }
-    of(BinaryExpression, operator, left, right) {
-      print_expression(out, **left);
-      space();
-      print_operator(out, *operator);
-      space();
-      print_expression(out, **right);
-    }
+    of(BinaryExpression, operator, left, right) print_operation_with_precedence(out, *operator, **left, **right);
   }
 }
 
