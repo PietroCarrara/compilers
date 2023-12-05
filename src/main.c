@@ -13,7 +13,7 @@ extern int yylineno;
 Program yyprogram;
 
 int main(int argc, char** argv) {
-  if (argc < 2) {
+  if (argc < 3) {
     return 1;
   }
 
@@ -23,13 +23,19 @@ int main(int argc, char** argv) {
     return 1;
   }
 
+  FILE* out = fopen(argv[2], "w");
+  if (out == NULL) {
+    printf("error: could not open output file \"%s\": %s", argv[2], strerror(errno));
+    return 1;
+  }
+
   // Parse and check for error
   if (yyparse()) {
     printf("error: invalid syntax at file %s:%d\n", argv[1], yylineno);
     return 3;
   }
 
-  print_program(stdout, yyprogram);
+  print_program(out, yyprogram);
 
   return 0;
 }

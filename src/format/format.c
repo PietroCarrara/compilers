@@ -171,7 +171,7 @@ void print_statement(FILE* out, Statement statement, int level) {
     of(ReturnStatement, expr) {
       string("return ");
       print_expression(out, *expr);
-      character(";");
+      character(';');
     }
     of(IfStatement, condition, body) {
       string("if (");
