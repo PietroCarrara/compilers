@@ -11,4 +11,4 @@ add_library(yacc ${BISON_yacc_OUTPUTS})
 target_include_directories(lex INTERFACE ${CMAKE_CURRENT_BINARY_DIR})
 
 target_link_libraries(yacc syntax-tree)
-target_link_libraries(lex syntax-tree)
+target_link_libraries(lex syntax-tree yacc)
