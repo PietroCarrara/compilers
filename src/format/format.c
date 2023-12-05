@@ -194,7 +194,7 @@ void print_statement(FILE* out, Statement statement, int level) {
       print_statement(out, **body, level);
     }
     of(BlockStatement, body) print_block_statement(out, *body, level);
-    of(EmptyStatement) { }
+    of(EmptyStatement) character(';');
   }
 }
 
@@ -251,7 +251,7 @@ void print_array_declaration(FILE* out, Type type, Identifier name, int size, Ar
   print_identifier(out, name);
   fprintf(out, "[%d]", size);
   if (values != NULL) {
-    string(" = ");
+    space();
     print_array_initialization(out, values);
   }
   string(";\n");
