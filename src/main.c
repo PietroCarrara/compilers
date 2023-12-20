@@ -1,6 +1,7 @@
 #include "format.h"
 #include "syntax-tree.h"
 #include "y.tab.h"
+#include "semantic-check.h"
 
 #include <errno.h>
 #include <stdio.h>
@@ -13,7 +14,7 @@ extern int yylineno;
 Program yyprogram;
 
 int main(int argc, char** argv) {
-  if (argc < 3) {
+  if (argc < 2) {
     return 1;
   }
 
@@ -23,19 +24,17 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  FILE* out = fopen(argv[2], "w");
-  if (out == NULL) {
-    printf("error: could not open output file \"%s\": %s", argv[2], strerror(errno));
-    return 1;
-  }
-
   // Parse and check for error
   if (yyparse()) {
     printf("error: invalid syntax at file %s:%d\n", argv[1], yylineno);
     return 3;
   }
 
-  print_program(out, yyprogram);
+  SemanticErrorList* list = verify_program(yyprogram);
+  while (list != NULL) {
+    printf("erro: %s\n", list->error);
+    list = list->next;
+  }
 
   return 0;
 }
