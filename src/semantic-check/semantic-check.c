@@ -76,6 +76,23 @@ SemanticErrorList* verify_double_declarations(DeclarationList* declarations) {
 datatype(HigherOrderType, (IntegerHigher), (FloatHigher), (CharHigher), (BooleanHigher), (StringHigher));
 datatype(ExpressionType, (InvalidType), (ValidType, HigherOrderType));
 
+int is_assignable_to(HigherOrderType storing, HigherOrderType stored) {
+  return storing.tag == stored.tag || MATCHES(storing, IntegerHigher) && MATCHES(stored, CharHigher) ||
+         MATCHES(storing, CharHigher) && MATCHES(stored, IntegerHigher);
+}
+
+const char* higher_to_string(HigherOrderType type) {
+  match(type) {
+    of(IntegerHigher) return "int";
+    of(FloatHigher) return "float";
+    of(CharHigher) return "char";
+    of(BooleanHigher) return "bool";
+    of(StringHigher) return "string";
+  }
+
+  return "UNKNOWN";
+}
+
 HigherOrderType type_to_higher(Type type) {
   match(type) {
     of(IntegerType) return IntegerHigher();
@@ -121,6 +138,10 @@ get_binary_expression_type(BinaryOperator operator, Expression left, Expression 
     }
     if (MATCHES(left_type, FloatHigher) && MATCHES(right_type, FloatHigher)) {
       return ValidType(FloatHigher());
+    }
+    if (MATCHES(left_type, CharHigher) && MATCHES(right_type, IntegerHigher) ||
+        MATCHES(left_type, IntegerHigher) && MATCHES(right_type, CharHigher)) {
+      return ValidType(IntegerHigher());
     }
     return InvalidType();
   }
@@ -191,6 +212,96 @@ ExpressionType get_expression_type(Expression expression, DeclarationList* decla
   return InvalidType();
 }
 
-SemanticErrorList* verify_statement(Statement statement) { return NULL; }
+SemanticErrorList* verify_expression(Expression expression, DeclarationList* declarations) { return NULL; }
 
-SemanticErrorList* verify_program(Program program) { return verify_double_declarations(program.declarations); }
+SemanticErrorList* verify_statement(Statement statement, DeclarationList* declarations) {
+  char error_message[999];
+
+  match(statement) {
+    of(AssignmentStatement, identifier, value) {
+      DeclarationSearchResult search_result = find_declaration(*identifier, declarations);
+      match(search_result) {
+        of(DeclarationNotFound) {
+          snprintf(error_message, sizeof(error_message), "identificador \"%s\" não encontrado", *identifier);
+          SemanticErrorList* error = make_semantic_error_list((SemanticError) { .message = strdup(error_message) });
+          error->next = verify_expression(*value, declarations);
+          return error;
+        }
+        of(DeclarationFound, declaration) {
+          match(*declaration) {
+            of(VariableDeclaration, type) {
+              HigherOrderType variable_type = type_to_higher(*type);
+              ExpressionType value_maybe_type = get_expression_type(*value, declarations);
+              match(value_maybe_type) {
+                of(InvalidType) {
+                  snprintf(
+                      error_message, sizeof(error_message), "tipagem inválida na atribuição à \"%s\"", *identifier
+                  );
+                  SemanticErrorList* error =
+                      make_semantic_error_list((SemanticError) { .message = strdup(error_message) });
+                  error->next = verify_expression(*value, declarations);
+                  return error;
+                }
+                of(ValidType, value_type) {
+                  if (!is_assignable_to(variable_type, *value_type)) {
+                    snprintf(
+                        error_message, sizeof(error_message),
+                        "impossível atribuir valor do tipo %s à variável \"%s\" do tipo %s",
+                        higher_to_string(*value_type), *identifier, higher_to_string(variable_type)
+                    );
+                    SemanticErrorList* error =
+                        make_semantic_error_list((SemanticError) { .message = strdup(error_message) });
+                    error->next = verify_expression(*value, declarations);
+                    return error;
+                  }
+                }
+              }
+            }
+            otherwise {
+              snprintf(error_message, sizeof(error_message), "atribuição à símbolo não-variável \"%s\"", *identifier);
+              return make_semantic_error_list((SemanticError) { .message = strdup(error_message) });
+            }
+          }
+        }
+      }
+    }
+    of(ArrayAssignmentStatement) { }
+    of(PrintStatement) { }
+    of(ReturnStatement) { }
+    of(IfStatement) { }
+    of(IfElseStatement) { }
+    of(WhileStatement) { }
+    of(BlockStatement) { }
+    of(EmptyStatement) { }
+  }
+
+  return NULL;
+}
+
+SemanticErrorList* concat_errors(SemanticErrorList* a, SemanticErrorList* b) {
+  if (a == NULL) {
+    return b;
+  }
+
+  if (b == NULL) {
+    return a;
+  }
+
+  a->next = concat_errors(a->next, b);
+  return a;
+}
+
+SemanticErrorList* verify_program(Program program) {
+  SemanticErrorList* errors = NULL;
+
+  errors = concat_errors(errors, verify_double_declarations(program.declarations));
+
+  ImplementationList* implementations = program.implementations;
+  while (implementations != NULL) {
+    errors = concat_errors(errors, verify_statement(implementations->implementation.body, program.declarations));
+
+    implementations = implementations->next;
+  }
+
+  return errors;
+}
