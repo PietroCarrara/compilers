@@ -45,7 +45,6 @@ ImplementationList* make_implementation_list(Implementation implementation) {
   return list;
 }
 
-
 Expression* make_expression(Expression expression) {
   Expression* alloc = malloc(sizeof(Expression));
   *alloc = expression;

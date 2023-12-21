@@ -39,8 +39,9 @@ datatype(
 
 datatype(
     Expression, (LiteralExpression, Literal), (IdentifierExpression, Identifier),
-    (ReadArrayExpression, Identifier, Expression*), (FunctionCallExpression, Identifier, struct ArgumentList*),
-    (InputExpression, Type), (BinaryExpression, BinaryOperator, Expression*, Expression*)
+    (ReadArrayExpression, Identifier, Expression*), // array name, index
+    (FunctionCallExpression, Identifier, struct ArgumentList*), (InputExpression, Type),
+    (BinaryExpression, BinaryOperator, Expression*, Expression*)
 );
 
 typedef struct ArgumentList {
@@ -69,7 +70,6 @@ typedef struct Implementation {
   Statement body;
 } Implementation;
 
-
 typedef struct ImplementationList {
   Implementation implementation;
   struct ImplementationList* next;
@@ -86,7 +86,6 @@ ArrayInitialization* make_array_initialization(Literal value);
 StatementList* make_statement_list(Statement statement);
 ArgumentList* make_argument_list(Expression argument);
 ImplementationList* make_implementation_list(Implementation implementation);
-
 
 Statement* make_statement(Statement statement);
 Expression* make_expression(Expression expression);

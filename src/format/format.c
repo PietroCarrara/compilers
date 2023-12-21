@@ -28,20 +28,20 @@ void print_type(FILE* out, Type type) {
 }
 
 void print_operator(FILE* out, BinaryOperator operator) {
-  match (operator) {
-    of (SumOperator) string("+");
-    of (SubtractionOperator) string("-");
-    of (MultiplicationOperator) string("*");
-    of (DivisionOperator) string("/");
-    of (LessThanOperator) string("<");
-    of (GreaterThanOperator) string(">");
-    of (AndOperator) string("&");
-    of (OrOperator) string("|");
-    of (NotOperator) string("~");
-    of (LessOrEqualOperator) string("<=");
-    of (GreaterOrEqualOperator) string(">=");
-    of (EqualsOperator) string("==");
-    of (DiffersOperator) string("!=");
+  match(operator) {
+    of(SumOperator) string("+");
+    of(SubtractionOperator) string("-");
+    of(MultiplicationOperator) string("*");
+    of(DivisionOperator) string("/");
+    of(LessThanOperator) string("<");
+    of(GreaterThanOperator) string(">");
+    of(AndOperator) string("&");
+    of(OrOperator) string("|");
+    of(NotOperator) string("~");
+    of(LessOrEqualOperator) string("<=");
+    of(GreaterOrEqualOperator) string(">=");
+    of(EqualsOperator) string("==");
+    of(DiffersOperator) string("!=");
   }
 }
 
@@ -54,14 +54,14 @@ void print_operation_with_precedence(FILE* out, BinaryOperator operator, Express
   char* left_prefix = "";
   char* left_postfix = "";
   if (is_high_precedence) {
-    match (left) {
+    match(left) {
       of(BinaryExpression, left_operator) {
         if (MATCHES(*left_operator, SumOperator) || MATCHES(*left_operator, SubtractionOperator)) {
           left_prefix = "(";
           left_postfix = ")";
         }
       }
-      otherwise {}
+      otherwise { }
     }
   }
   string(left_prefix);
@@ -75,14 +75,14 @@ void print_operation_with_precedence(FILE* out, BinaryOperator operator, Express
   char* right_prefix = "";
   char* right_postfix = "";
   if (is_high_precedence) {
-    match (right) {
+    match(right) {
       of(BinaryExpression, right_operator) {
         if (MATCHES(*right_operator, SumOperator) || MATCHES(*right_operator, SubtractionOperator)) {
           right_prefix = "(";
           right_postfix = ")";
         }
       }
-      otherwise {}
+      otherwise { }
     }
   }
   string(right_prefix);
@@ -123,7 +123,7 @@ void print_expression(FILE* out, Expression expression) {
       print_type(out, *type);
       character(')');
     }
-    of(BinaryExpression, operator, left, right) print_operation_with_precedence(out, *operator, **left, **right);
+    of(BinaryExpression, operator, left, right) print_operation_with_precedence(out, *operator, ** left, **right);
   }
 }
 

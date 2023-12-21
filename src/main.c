@@ -1,7 +1,7 @@
 #include "format.h"
+#include "semantic-check.h"
 #include "syntax-tree.h"
 #include "y.tab.h"
-#include "semantic-check.h"
 
 #include <errno.h>
 #include <stdio.h>
