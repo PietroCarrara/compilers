@@ -13,6 +13,19 @@ SemanticErrorList* make_semantic_error_list(SemanticError error) {
   return list;
 }
 
+SemanticErrorList* concat_errors(SemanticErrorList* a, SemanticErrorList* b) {
+  if (a == NULL) {
+    return b;
+  }
+
+  if (b == NULL) {
+    return a;
+  }
+
+  a->next = concat_errors(a->next, b);
+  return a;
+}
+
 datatype(DeclarationSearchResult, (DeclarationNotFound), (DeclarationFound, Declaration, Type, Identifier));
 
 DeclarationSearchResult find_declaration(Identifier target, DeclarationList* declarations) {
@@ -216,16 +229,16 @@ SemanticErrorList* verify_expression(Expression expression, DeclarationList* dec
 
 SemanticErrorList* verify_statement(Statement statement, DeclarationList* declarations) {
   char error_message[999];
+  SemanticErrorList* error = NULL;
 
   match(statement) {
     of(AssignmentStatement, identifier, value) {
+      error = concat_errors(error, verify_expression(*value, declarations));
       DeclarationSearchResult search_result = find_declaration(*identifier, declarations);
       match(search_result) {
         of(DeclarationNotFound) {
           snprintf(error_message, sizeof(error_message), "identificador \"%s\" não encontrado", *identifier);
-          SemanticErrorList* error = make_semantic_error_list((SemanticError) { .message = strdup(error_message) });
-          error->next = verify_expression(*value, declarations);
-          return error;
+          error = concat_errors(error, make_semantic_error_list((SemanticError) { .message = strdup(error_message) }));
         }
         of(DeclarationFound, declaration) {
           match(*declaration) {
@@ -233,15 +246,6 @@ SemanticErrorList* verify_statement(Statement statement, DeclarationList* declar
               HigherOrderType variable_type = type_to_higher(*type);
               ExpressionType value_maybe_type = get_expression_type(*value, declarations);
               match(value_maybe_type) {
-                of(InvalidType) {
-                  snprintf(
-                      error_message, sizeof(error_message), "tipagem inválida na atribuição à \"%s\"", *identifier
-                  );
-                  SemanticErrorList* error =
-                      make_semantic_error_list((SemanticError) { .message = strdup(error_message) });
-                  error->next = verify_expression(*value, declarations);
-                  return error;
-                }
                 of(ValidType, value_type) {
                   if (!is_assignable_to(variable_type, *value_type)) {
                     snprintf(
@@ -249,46 +253,147 @@ SemanticErrorList* verify_statement(Statement statement, DeclarationList* declar
                         "impossível atribuir valor do tipo %s à variável \"%s\" do tipo %s",
                         higher_to_string(*value_type), *identifier, higher_to_string(variable_type)
                     );
-                    SemanticErrorList* error =
-                        make_semantic_error_list((SemanticError) { .message = strdup(error_message) });
-                    error->next = verify_expression(*value, declarations);
+                    error = concat_errors(
+                        error, make_semantic_error_list((SemanticError) { .message = strdup(error_message) })
+                    );
                     return error;
                   }
                 }
+                otherwise { }
               }
             }
             otherwise {
               snprintf(error_message, sizeof(error_message), "atribuição à símbolo não-variável \"%s\"", *identifier);
-              return make_semantic_error_list((SemanticError) { .message = strdup(error_message) });
+              error =
+                  concat_errors(error, make_semantic_error_list((SemanticError) { .message = strdup(error_message) }));
             }
           }
         }
       }
     }
-    of(ArrayAssignmentStatement) { }
-    of(PrintStatement) { }
-    of(ReturnStatement) { }
-    of(IfStatement) { }
-    of(IfElseStatement) { }
-    of(WhileStatement) { }
-    of(BlockStatement) { }
+    of(ArrayAssignmentStatement, identifier, index, value) {
+      error = concat_errors(error, verify_expression(*value, declarations));
+      error = concat_errors(error, verify_expression(*index, declarations));
+
+      ExpressionType index_maybe_type = get_expression_type(*index, declarations);
+      match(index_maybe_type) {
+        of(ValidType, higher) {
+          if (!MATCHES(*higher, IntegerHigher)) {
+            snprintf(
+                error_message, sizeof(error_message), "impossível usar tipo %s no acesso ao vetor \"%s\"",
+                higher_to_string(*higher), *identifier
+            );
+            error =
+                concat_errors(error, make_semantic_error_list((SemanticError) { .message = strdup(error_message) }));
+          }
+        }
+        otherwise { }
+      }
+
+      DeclarationSearchResult search_result = find_declaration(*identifier, declarations);
+      match(search_result) {
+        of(DeclarationNotFound) {
+          snprintf(error_message, sizeof(error_message), "identificador \"%s\" não encontrado", *identifier);
+          error = concat_errors(error, make_semantic_error_list((SemanticError) { .message = strdup(error_message) }));
+        }
+        of(DeclarationFound, declaration) {
+          match(*declaration) {
+            of(ArrayDeclaration, type) {
+              HigherOrderType variable_type = type_to_higher(*type);
+              ExpressionType value_maybe_type = get_expression_type(*value, declarations);
+              match(value_maybe_type) {
+                of(ValidType, value_type) {
+                  if (!is_assignable_to(variable_type, *value_type)) {
+                    snprintf(
+                        error_message, sizeof(error_message),
+                        "impossível atribuir valor do tipo %s a índice da variável \"%s\" do tipo %s[]",
+                        higher_to_string(*value_type), *identifier, higher_to_string(variable_type)
+                    );
+                    error = concat_errors(
+                        error, make_semantic_error_list((SemanticError) { .message = strdup(error_message) })
+                    );
+                    return error;
+                  }
+                }
+                otherwise { }
+              }
+            }
+            otherwise {
+              snprintf(
+                  error_message, sizeof(error_message), "atribuição indexada a valor não-vetorial \"%s\"", *identifier
+              );
+              error =
+                  concat_errors(error, make_semantic_error_list((SemanticError) { .message = strdup(error_message) }));
+            }
+          }
+        }
+      }
+    }
+    of(PrintStatement, expr) error = concat_errors(error, verify_expression(*expr, declarations));
+    of(ReturnStatement, expr) error = concat_errors(error, verify_expression(*expr, declarations));
+    of(IfStatement, cond, true_branch) {
+      error = verify_expression(*cond, declarations);
+
+      ExpressionType cond_type = get_expression_type(*cond, declarations);
+      match(cond_type) {
+        of(ValidType, higher) {
+          if (!MATCHES(*higher, BooleanHigher)) {
+            snprintf(error_message, sizeof(error_message), "condição não booleana em bloco if");
+            error =
+                concat_errors(error, make_semantic_error_list((SemanticError) { .message = strdup(error_message) }));
+          }
+        }
+        otherwise { }
+      }
+
+      error = concat_errors(error, verify_statement(**true_branch, declarations));
+    }
+    of(IfElseStatement, cond, true_branch, false_branch) {
+      error = verify_expression(*cond, declarations);
+
+      ExpressionType cond_type = get_expression_type(*cond, declarations);
+      match(cond_type) {
+        of(ValidType, higher) {
+          if (!MATCHES(*higher, BooleanHigher)) {
+            snprintf(error_message, sizeof(error_message), "condição não booleana em bloco if");
+            error =
+                concat_errors(error, make_semantic_error_list((SemanticError) { .message = strdup(error_message) }));
+          }
+        }
+        otherwise { }
+      }
+
+      error = concat_errors(error, verify_statement(**true_branch, declarations));
+      error = concat_errors(error, verify_statement(**false_branch, declarations));
+    }
+    of(WhileStatement, cond, body) {
+      error = verify_expression(*cond, declarations);
+
+      ExpressionType cond_type = get_expression_type(*cond, declarations);
+      match(cond_type) {
+        of(ValidType, higher) {
+          if (!MATCHES(*higher, BooleanHigher)) {
+            snprintf(error_message, sizeof(error_message), "condição não booleana em bloco while");
+            error =
+                concat_errors(error, make_semantic_error_list((SemanticError) { .message = strdup(error_message) }));
+          }
+        }
+        otherwise { }
+      }
+
+      error = concat_errors(error, verify_statement(**body, declarations));
+    }
+    of(BlockStatement, llist) {
+      StatementList* list = *llist;
+      while (list != NULL) {
+        error = concat_errors(error, verify_statement(list->statement, declarations));
+        list = list->next;
+      }
+    }
     of(EmptyStatement) { }
   }
 
-  return NULL;
-}
-
-SemanticErrorList* concat_errors(SemanticErrorList* a, SemanticErrorList* b) {
-  if (a == NULL) {
-    return b;
-  }
-
-  if (b == NULL) {
-    return a;
-  }
-
-  a->next = concat_errors(a->next, b);
-  return a;
+  return error;
 }
 
 SemanticErrorList* verify_program(Program program) {
