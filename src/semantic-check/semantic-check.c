@@ -225,7 +225,176 @@ ExpressionType get_expression_type(Expression expression, DeclarationList* decla
   return InvalidType();
 }
 
-SemanticErrorList* verify_expression(Expression expression, DeclarationList* declarations) { return NULL; }
+SemanticErrorList* verify_expression(Expression expression, DeclarationList* declarations) {
+  char error_message[999];
+  SemanticErrorList* error = NULL;
+
+  match(expression) {
+    of(LiteralExpression, literal) { }
+    of(IdentifierExpression, identifier) {
+      DeclarationSearchResult searchResult = find_declaration(*identifier, declarations);
+      match(searchResult) {
+        of(DeclarationNotFound) {
+          snprintf(error_message, sizeof(error_message), "identificador \"%s\" não encontrado", *identifier);
+          error = concat_errors(error, make_semantic_error_list((SemanticError) { .message = strdup(error_message) }));
+        }
+        of(DeclarationFound, declaration) {
+          match(*declaration) {
+            of(VariableDeclaration) { }
+            otherwise {
+              snprintf(
+                  error_message, sizeof(error_message), "identificador \"%s\" não-escalar aparece em expressão",
+                  *identifier
+              );
+              error =
+                  concat_errors(error, make_semantic_error_list((SemanticError) { .message = strdup(error_message) }));
+            }
+          }
+        }
+      }
+    }
+    of(ReadArrayExpression, identifier, index) {
+      error = concat_errors(error, verify_expression(**index, declarations));
+
+      ExpressionType index_type = get_expression_type(**index, declarations);
+      match(index_type) {
+        of(ValidType, higher) {
+          if (!is_assignable_to(IntegerHigher(), *higher)) {
+            snprintf(
+                error_message, sizeof(error_message),
+                "expressão do tipo %s usada para indexar vetor \"%s\", esperava int", higher_to_string(*higher),
+                *identifier
+            );
+            error =
+                concat_errors(error, make_semantic_error_list((SemanticError) { .message = strdup(error_message) }));
+          }
+        }
+        otherwise { }
+      }
+
+      DeclarationSearchResult searchResult = find_declaration(*identifier, declarations);
+      match(searchResult) {
+        of(DeclarationNotFound) {
+          snprintf(error_message, sizeof(error_message), "identificador \"%s\" não encontrado", *identifier);
+          error = concat_errors(error, make_semantic_error_list((SemanticError) { .message = strdup(error_message) }));
+        }
+        of(DeclarationFound, declaration) {
+          match(*declaration) {
+            of(ArrayDeclaration) { }
+            otherwise {
+              snprintf(
+                  error_message, sizeof(error_message), "identificador não-vetorial \"%s\" indexado como vetor",
+                  *identifier
+              );
+              error =
+                  concat_errors(error, make_semantic_error_list((SemanticError) { .message = strdup(error_message) }));
+            }
+          }
+        }
+      }
+    }
+    of(FunctionCallExpression, identifier, aarguments) {
+      DeclarationSearchResult searchResult = find_declaration(*identifier, declarations);
+      match(searchResult) {
+        of(DeclarationNotFound) {
+          snprintf(error_message, sizeof(error_message), "uso de função não-declarada \"%s\"", *identifier);
+          error = concat_errors(error, make_semantic_error_list((SemanticError) { .message = strdup(error_message) }));
+        }
+        of(DeclarationFound, declaration) {
+          match(*declaration) {
+            of(FunctionDeclaration, type, _, pparameters) {
+              ArgumentList* arguments = *aarguments;
+              ParametersDeclaration* parameters = *pparameters;
+              int neededArguments = 0, passedArguments = 0;
+
+              while (arguments != NULL && parameters != NULL) {
+                ExpressionType type = get_expression_type(arguments->argument, declarations);
+                match(type) {
+                  of(ValidType, higher) {
+                    if (!is_assignable_to(type_to_higher(parameters->type), *higher)) {
+                      snprintf(
+                          error_message, sizeof(error_message),
+                          "tipo %s passado para \"%s\" na chamada da função \"%s\", esperava %s",
+                          higher_to_string(*higher), parameters->name, *identifier,
+                          higher_to_string(type_to_higher(parameters->type))
+                      );
+                      error = concat_errors(
+                          error, make_semantic_error_list((SemanticError) { .message = strdup(error_message) })
+                      );
+                    }
+                  }
+                  otherwise { }
+                }
+
+                arguments = arguments->next;
+                parameters = parameters->next;
+                neededArguments++;
+                passedArguments++;
+              }
+
+              while (arguments != NULL) {
+                arguments = arguments->next;
+                passedArguments++;
+              }
+              while (parameters != NULL) {
+                parameters = parameters->next;
+                neededArguments++;
+              }
+
+              if (neededArguments != passedArguments) {
+                snprintf(
+                    error_message, sizeof(error_message), "\"%s\" esperava %d argumentos, mas recebeu %d", *identifier,
+                    neededArguments, passedArguments
+                );
+                error = concat_errors(
+                    error, make_semantic_error_list((SemanticError) { .message = strdup(error_message) })
+                );
+              }
+            }
+            otherwise {
+              snprintf(
+                  error_message, sizeof(error_message), "identificador não-chamável \"%s\" usado como função",
+                  *identifier
+              );
+              error =
+                  concat_errors(error, make_semantic_error_list((SemanticError) { .message = strdup(error_message) }));
+            }
+          }
+        }
+      }
+    }
+    of(InputExpression, type) { }
+    of(BinaryExpression, operator, left, right) {
+      error = concat_errors(error, verify_expression(**left, declarations));
+      error = concat_errors(error, verify_expression(**right, declarations));
+
+      ExpressionType left_type = get_expression_type(**left, declarations);
+      ExpressionType right_type = get_expression_type(**right, declarations);
+
+      match(left_type) {
+        of(ValidType, left_higher) {
+          match(right_type) {
+            of(ValidType, right_higher) {
+              if (!is_assignable_to(*left_higher, *right_higher)) {
+                snprintf(
+                    error_message, sizeof(error_message), "expressão binária com tipos incompatíveis: %s e %s",
+                    higher_to_string(*left_higher), higher_to_string(*right_higher)
+                );
+                error = concat_errors(
+                    error, make_semantic_error_list((SemanticError) { .message = strdup(error_message) })
+                );
+              }
+            }
+            otherwise { }
+          }
+        }
+        otherwise { }
+      }
+    }
+  }
+
+  return error;
+}
 
 SemanticErrorList* verify_statement(Statement statement, DeclarationList* declarations) {
   char error_message[999];
@@ -278,7 +447,7 @@ SemanticErrorList* verify_statement(Statement statement, DeclarationList* declar
       ExpressionType index_maybe_type = get_expression_type(*index, declarations);
       match(index_maybe_type) {
         of(ValidType, higher) {
-          if (!MATCHES(*higher, IntegerHigher)) {
+          if (!is_assignable_to(IntegerHigher(), *higher)) {
             snprintf(
                 error_message, sizeof(error_message), "impossível usar tipo %s no acesso ao vetor \"%s\"",
                 higher_to_string(*higher), *identifier
