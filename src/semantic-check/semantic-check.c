@@ -565,14 +565,36 @@ SemanticErrorList* verify_statement(Statement statement, DeclarationList* declar
   return error;
 }
 
+SemanticErrorList* verify_implementation(Implementation implementation, DeclarationList* declarations) {
+  char error_message[999];
+  SemanticErrorList* errors = NULL;
+  errors = concat_errors(errors, verify_statement(implementation.body, declarations));
+
+  DeclarationSearchResult declaration_result = find_declaration(implementation.name, declarations);
+  match(declaration_result) {
+    of(DeclarationFound, declaration) {
+      // TODO: Check return typing and match agains function type
+    }
+    of(DeclarationNotFound) {
+      snprintf(
+          error_message, sizeof(error_message), "função \"%s\" implementada mas não declarada", implementation.name
+      );
+      errors = concat_errors(errors, make_semantic_error_list((SemanticError) { .message = strdup(error_message) }));
+    }
+  }
+
+  return errors;
+}
+
 SemanticErrorList* verify_program(Program program) {
   SemanticErrorList* errors = NULL;
 
+  // TODO: Check that every declared function is implemented
   errors = concat_errors(errors, verify_double_declarations(program.declarations));
 
   ImplementationList* implementations = program.implementations;
   while (implementations != NULL) {
-    errors = concat_errors(errors, verify_statement(implementations->implementation.body, program.declarations));
+    errors = concat_errors(errors, verify_implementation(implementations->implementation, program.declarations));
 
     implementations = implementations->next;
   }
