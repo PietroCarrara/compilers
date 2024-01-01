@@ -1,6 +1,6 @@
 #!/bin/sh
 shopt -s globstar
-OUT=etapa3
+OUT=etapa4
 
 main() {
 	mkdir -p release/
