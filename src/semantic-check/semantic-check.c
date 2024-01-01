@@ -722,23 +722,48 @@ SemanticErrorList* verify_statement_return_types(
   return errors;
 }
 
+DeclarationList* concat_params(ParametersDeclaration* params, DeclarationList* declarations) {
+  DeclarationList* head = NULL;
+  DeclarationList* tail = NULL;
+
+  while (params != NULL) {
+    // HACK: Put a non-type-matching initial value inside the declaration
+    DeclarationList* new_node = make_declaration(VariableDeclaration(params->type, params->name, IntLiteral(0)));
+
+    if (tail != NULL) {
+      tail->next = new_node;
+    }
+    tail = new_node;
+
+    if (head == NULL) {
+      head = tail;
+    }
+
+    params = params->next;
+  }
+
+  return head != NULL ? head : declarations;
+}
+
 SemanticErrorList* verify_implementation(Implementation implementation, DeclarationList* declarations) {
   // TODO: Prepend declarations with function parameters?
 
   char error_message[999];
   SemanticErrorList* errors = NULL;
-  errors = concat_errors(errors, verify_statement(implementation.body, declarations));
-  errors = concat_errors(errors, verify_implementation_all_branches_return(implementation, declarations));
 
   DeclarationSearchResult declaration_result = find_declaration(implementation.name, declarations);
   match(declaration_result) {
     of(DeclarationFound, declaration) {
       match(*declaration) {
-        of(FunctionDeclaration, function_type) {
+        of(FunctionDeclaration, function_type, _, params) {
+          DeclarationList* context = concat_params(*params, declarations);
+
           errors = concat_errors(
               errors,
-              verify_statement_return_types(implementation.body, implementation.name, *function_type, declarations)
+              verify_statement_return_types(implementation.body, implementation.name, *function_type, context)
           );
+          errors = concat_errors(errors, verify_implementation_all_branches_return(implementation, context));
+          errors = concat_errors(errors, verify_statement(implementation.body, context));
         }
         otherwise {
           snprintf(
