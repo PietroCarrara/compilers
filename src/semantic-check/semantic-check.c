@@ -27,6 +27,7 @@ SemanticErrorList* concat_errors(SemanticErrorList* a, SemanticErrorList* b) {
 }
 
 datatype(DeclarationSearchResult, (DeclarationNotFound), (DeclarationFound, Declaration, Type, Identifier));
+datatype(ImplementationSearchResult, (ImplementationNotFound), (ImplementationFound, Implementation));
 
 DeclarationSearchResult find_declaration(Identifier target, DeclarationList* declarations) {
   if (declarations == NULL) {
@@ -57,6 +58,18 @@ DeclarationSearchResult find_declaration(Identifier target, DeclarationList* dec
   return find_declaration(target, declarations->next);
 }
 
+ImplementationSearchResult find_implementation(Identifier target, ImplementationList* implementations) {
+  if (implementations == NULL) {
+    return ImplementationNotFound();
+  }
+
+  if (strcmp(implementations->implementation.name, target) == 0) {
+    return ImplementationFound(implementations->implementation);
+  }
+
+  return find_implementation(target, implementations->next);
+}
+
 SemanticErrorList* verify_double_declarations(DeclarationList* declarations) {
   if (declarations == NULL) {
     return NULL;
@@ -85,9 +98,31 @@ SemanticErrorList* verify_double_declarations(DeclarationList* declarations) {
   return error != NULL ? error : next_errors;
 }
 
+SemanticErrorList* verify_double_implementations(ImplementationList* implementations) {
+  char error_message[999];
+  SemanticErrorList* errors = NULL;
+
+  while (implementations != NULL) {
+    if (MATCHES(
+            find_implementation(implementations->implementation.name, implementations->next), ImplementationFound
+        )) {
+      snprintf(
+          error_message, sizeof(error_message), "identificador \"%s\" declarado mais de uma vez",
+          implementations->implementation.name
+      );
+      errors = concat_errors(errors, make_semantic_error_list((SemanticError) { .message = strdup(error_message) }));
+    }
+
+    implementations = implementations->next;
+  }
+
+  return errors;
+}
+
 // Types that no object can have, but expressions can yield
 datatype(HigherOrderType, (IntegerHigher), (FloatHigher), (CharHigher), (BooleanHigher), (StringHigher));
 datatype(ExpressionType, (InvalidType), (ValidType, HigherOrderType));
+datatype(OptionExpressionType, (NoneExpressionType), (SomeExpressionType, ExpressionType));
 
 int is_assignable_to(HigherOrderType storing, HigherOrderType stored) {
   return storing.tag == stored.tag || MATCHES(storing, IntegerHigher) && MATCHES(stored, CharHigher) ||
@@ -217,12 +252,44 @@ ExpressionType get_expression_type(Expression expression, DeclarationList* decla
     }
     of(InputExpression, type) return ValidType(type_to_higher(*type));
     of(BinaryExpression, operator, left, right) {
-      //                                            vvv Why clang-format is doing this is a mystery :O
+      //                                          vvvv Why clang-format is doing this is a mystery :O
       return get_binary_expression_type(*operator, ** left, **right, declarations);
     }
   }
 
   return InvalidType();
+}
+
+OptionExpressionType join_types(OptionExpressionType a, OptionExpressionType b) {
+  match(a) {
+    of(NoneExpressionType) return b;
+    of(SomeExpressionType, unvalidated_type_a) {
+      match(*unvalidated_type_a) {
+        of(InvalidType) return a;
+        of(ValidType, type_a) {
+          match(b) {
+            of(NoneExpressionType) return a;
+            of(SomeExpressionType, unvalidated_type_b) {
+              match(*unvalidated_type_b) {
+                of(InvalidType) return b;
+                of(ValidType, type_b) {
+                  if (is_assignable_to(*type_a, *type_b)) {
+                    return SomeExpressionType(ValidType(*type_a));
+                  } else if (is_assignable_to(*type_b, *type_a)) {
+                    return SomeExpressionType(ValidType(*type_b));
+                  } else {
+                    return SomeExpressionType(InvalidType());
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return SomeExpressionType(InvalidType());
 }
 
 SemanticErrorList* verify_expression(Expression expression, DeclarationList* declarations) {
@@ -565,22 +632,156 @@ SemanticErrorList* verify_statement(Statement statement, DeclarationList* declar
   return error;
 }
 
+int does_statement_always_return(Statement statement, DeclarationList* declarations) {
+  match(statement) {
+    of(ReturnStatement) { return 1; }
+    of(IfElseStatement, _, true_block, false_block) {
+      return does_statement_always_return(**true_block, declarations) &&
+             does_statement_always_return(**false_block, declarations);
+    }
+    of(BlockStatement, s) {
+      StatementList* list = *s;
+      // If at least 1 statement is garanteed to return, we're safe
+      while (list != NULL) {
+        if (does_statement_always_return(list->statement, declarations)) {
+          return 1;
+        }
+        list = list->next;
+      }
+
+      return 0;
+    }
+    otherwise { return 0; }
+  }
+
+  return 0;
+}
+
+SemanticErrorList*
+verify_implementation_all_branches_return(Implementation implementation, DeclarationList* declarations) {
+  char error_message[999];
+  SemanticErrorList* errors = NULL;
+
+  if (!does_statement_always_return(implementation.body, declarations)) {
+    snprintf(error_message, sizeof(error_message), "função \"%s\" contém ramos sem retorno", implementation.name);
+    errors = concat_errors(errors, make_semantic_error_list((SemanticError) { .message = strdup(error_message) }));
+  }
+
+  return errors;
+}
+
+SemanticErrorList* verify_statement_return_types(
+    Statement statement, Identifier function_identifier, Type expected_return, DeclarationList* declarations
+) {
+  char error_message[999];
+  SemanticErrorList* errors = NULL;
+
+  match(statement) {
+    of(ReturnStatement, expr) {
+      ExpressionType expr_type = get_expression_type(*expr, declarations);
+      match(expr_type) {
+        of(ValidType, higher) {
+          if (!is_assignable_to(type_to_higher(expected_return), *higher)) {
+            snprintf(
+                error_message, sizeof(error_message), "retorno do tipo %s é inválido para função \"%s\" do tipo %s",
+                higher_to_string(*higher), function_identifier, higher_to_string(type_to_higher(expected_return))
+            );
+            errors =
+                concat_errors(errors, make_semantic_error_list((SemanticError) { .message = strdup(error_message) }));
+          }
+        }
+        otherwise { }
+      }
+    }
+    of(IfStatement, _, block) errors = concat_errors(
+        errors, verify_statement_return_types(**block, function_identifier, expected_return, declarations)
+    );
+    of(IfElseStatement, _, true_block, false_block) {
+      errors = concat_errors(
+          errors, verify_statement_return_types(**true_block, function_identifier, expected_return, declarations)
+      );
+      errors = concat_errors(
+          errors, verify_statement_return_types(**false_block, function_identifier, expected_return, declarations)
+      );
+    }
+    of(WhileStatement, _, block) errors = concat_errors(
+        errors, verify_statement_return_types(**block, function_identifier, expected_return, declarations)
+    );
+    of(BlockStatement, s) {
+      StatementList* list = *s;
+      while (list != NULL) {
+        errors = concat_errors(
+            errors, verify_statement_return_types(list->statement, function_identifier, expected_return, declarations)
+        );
+        list = list->next;
+      }
+    }
+    otherwise { }
+  }
+
+  return errors;
+}
+
 SemanticErrorList* verify_implementation(Implementation implementation, DeclarationList* declarations) {
+  // TODO: Prepend declarations with function parameters?
+
   char error_message[999];
   SemanticErrorList* errors = NULL;
   errors = concat_errors(errors, verify_statement(implementation.body, declarations));
+  errors = concat_errors(errors, verify_implementation_all_branches_return(implementation, declarations));
 
   DeclarationSearchResult declaration_result = find_declaration(implementation.name, declarations);
   match(declaration_result) {
     of(DeclarationFound, declaration) {
-      // TODO: Check return typing and match agains function type
+      match(*declaration) {
+        of(FunctionDeclaration, function_type) {
+          errors = concat_errors(
+              errors,
+              verify_statement_return_types(implementation.body, implementation.name, *function_type, declarations)
+          );
+        }
+        otherwise {
+          snprintf(
+              error_message, sizeof(error_message), "função \"%s\" implementada mas declarada com tipo não-função",
+              implementation.name
+          );
+          errors =
+              concat_errors(errors, make_semantic_error_list((SemanticError) { .message = strdup(error_message) }));
+        }
+      }
+      of(DeclarationNotFound) {
+        snprintf(
+            error_message, sizeof(error_message), "função \"%s\" implementada mas não declarada", implementation.name
+        );
+        errors = concat_errors(errors, make_semantic_error_list((SemanticError) { .message = strdup(error_message) }));
+      }
     }
-    of(DeclarationNotFound) {
-      snprintf(
-          error_message, sizeof(error_message), "função \"%s\" implementada mas não declarada", implementation.name
-      );
-      errors = concat_errors(errors, make_semantic_error_list((SemanticError) { .message = strdup(error_message) }));
+  }
+
+  return errors;
+}
+
+SemanticErrorList* verify_missing_implementation(DeclarationList* declarations, ImplementationList* implementations) {
+  char error_message[999];
+  SemanticErrorList* errors = NULL;
+
+  while (declarations != NULL) {
+    match(declarations->declaration) {
+      of(FunctionDeclaration, _, identifier) {
+        ImplementationSearchResult result = find_implementation(*identifier, implementations);
+        match(result) {
+          of(ImplementationNotFound) {
+            snprintf(error_message, sizeof(error_message), "função \"%s\" declarada mas não implementada", *identifier);
+            errors =
+                concat_errors(errors, make_semantic_error_list((SemanticError) { .message = strdup(error_message) }));
+          }
+          otherwise { }
+        }
+      }
+      otherwise { }
     }
+
+    declarations = declarations->next;
   }
 
   return errors;
@@ -589,7 +790,8 @@ SemanticErrorList* verify_implementation(Implementation implementation, Declarat
 SemanticErrorList* verify_program(Program program) {
   SemanticErrorList* errors = NULL;
 
-  // TODO: Check that every declared function is implemented
+  errors = concat_errors(errors, verify_missing_implementation(program.declarations, program.implementations));
+  errors = concat_errors(errors, verify_double_implementations(program.implementations));
   errors = concat_errors(errors, verify_double_declarations(program.declarations));
 
   ImplementationList* implementations = program.implementations;
