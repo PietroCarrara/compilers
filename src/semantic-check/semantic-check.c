@@ -201,6 +201,14 @@ get_binary_expression_type(BinaryOperator operator, Expression left, Expression 
     return InvalidType();
   }
 
+  if (is_logic) {
+    if (MATCHES(left_type, BooleanHigher) && MATCHES(right_type, BooleanHigher)) {
+      return ValidType(BooleanHigher());
+    }
+
+    return InvalidType();
+  }
+
   return InvalidType();
 }
 
@@ -759,8 +767,7 @@ SemanticErrorList* verify_implementation(Implementation implementation, Declarat
           DeclarationList* context = concat_params(*params, declarations);
 
           errors = concat_errors(
-              errors,
-              verify_statement_return_types(implementation.body, implementation.name, *function_type, context)
+              errors, verify_statement_return_types(implementation.body, implementation.name, *function_type, context)
           );
           errors = concat_errors(errors, verify_implementation_all_branches_return(implementation, context));
           errors = concat_errors(errors, verify_statement(implementation.body, context));
