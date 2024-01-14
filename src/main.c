@@ -31,9 +31,12 @@ int main(int argc, char** argv) {
   }
 
   SemanticErrorList* list = verify_program(yyprogram);
-  while (list != NULL) {
-    printf("erro: %s\n", list->error.message);
-    list = list->next;
+  if (list != NULL) {
+    while (list != NULL) {
+      printf("erro: %s\n", list->error.message);
+      list = list->next;
+    }
+    return 4;
   }
 
   return 0;
