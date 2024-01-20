@@ -1,4 +1,5 @@
 #include "format.h"
+#include "intermediary-code.h"
 #include "semantic-check.h"
 #include "syntax-tree.h"
 #include "y.tab.h"
@@ -38,6 +39,9 @@ int main(int argc, char** argv) {
     }
     return 4;
   }
+
+  IntermediaryCode* ic = make_intermediary_code(program);
+  print_intermediary_code(stdout, ic);
 
   return 0;
 }

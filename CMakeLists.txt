@@ -27,4 +27,4 @@ endif()
 
 add_subdirectory(src)
 
-target_link_libraries(compilerProject datatype99 lex yacc syntax-tree format semantic-check)
+target_link_libraries(compilerProject datatype99 lex yacc syntax-tree format semantic-check intermediary-code)

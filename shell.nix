@@ -7,5 +7,6 @@ pkgs.mkShell {
     cmake
     clang_14
     flex
+    clang-tools
   ];
 }
