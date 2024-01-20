@@ -21,17 +21,58 @@ void print_declaration_code(FILE* out, Declaration declaration) {
   match(declaration) {
     of(VariableDeclaration, _, identifier, literal) {
       print_identifier(out, *identifier);
-      string(": const ");
+      string(": value ");
       print_literal(out, *literal);
+      string("\n");
     }
-    of(ArrayDeclaration) { }
-    of(FunctionDeclaration) { }
+    of(ArrayDeclaration, _, identifier, size, initial_values) {
+      print_identifier(out, *identifier);
+      string(":\n");
+      if (size == 0) {
+        string("value 0\n");
+      } else {
+        int i = 0;
+        ArrayInitialization* values = *initial_values;
+        for (int i = 0; i < *size; i++) {
+          if (values != NULL) {
+            string("value ");
+            print_literal(out, values->value);
+            string("\n");
+            values = values->next;
+          } else {
+            string("value 0\n");
+          }
+        }
+      }
+    }
+    of(FunctionDeclaration) { } // Do nothing
   }
 }
 
 void print_intermediary_code(FILE* out, IntermediaryCode* code) {
   while (code != NULL) {
-    match(code->instruction) { of(CodeDeclaration, declaration) print_declaration_code(out, *declaration); }
+    if (code->label != NULL) {
+      string(*(code->label));
+      string(":\n");
+    }
+
+    match(code->instruction) {
+      of(CodeDeclaration, declaration) print_declaration_code(out, *declaration);
+      of(CodeStore, identifier) {
+        string("store ");
+        print_identifier(out, *identifier);
+        string("\n");
+      }
+      of(CodeStoreArray, identifier) {
+        string("store_at_position ");
+        print_identifier(out, *identifier);
+        string("\n");
+      }
+      of(CodeReturnValue) { string("return_value\n"); }
+      of(CodePrint) { string("print\n"); }
+      of(CodeReturn) { string("return\n"); }
+      of(CodeJumpIfFalse, label) { string("jump_if_false "); string(**label); string("\n"); }
+    }
 
     code = code->next;
   }

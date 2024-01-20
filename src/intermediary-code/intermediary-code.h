@@ -6,16 +6,19 @@
 #include <datatype99.h>
 #include <stdio.h>
 
-typedef int Register;
+typedef char* Label;
 
+// TODO: Get rid of Jumps (and therefore labels). Use high level constructs, let the printing handle the labels.
+// Maybe don't even have this? Just print directly from the AST?
 datatype(
-    IntermediaryCodeInstruction, (CodeDeclaration, Declaration), (CodeLoad, Identifier, Register),
-    (CodeStore, Register, Identifier), (CodeBinary, Register, Register, BinaryOperator),
-    (CodeJump, IntermediaryCodeInstruction*), (CodeJumpIfZero, IntermediaryCodeInstruction*),
-    (CodeCall, Identifier, ArgumentList*)
+    IntermediaryCodeInstruction, (CodeDeclaration, Declaration), (CodeLoad, Identifier), (CodeStore, Identifier),
+    (CodeReturnValue), (CodeReturn), (CodeRead, Type), (CodePrint), (CodeLoadArray, Identifier),
+    (CodeStoreArray, Identifier), (CodeBinary, BinaryOperator), (CodeJump, Label*), (CodeJumpIfFalse, Label*),
+    (CodeCall, Label*, ArgumentList*), (CodeNop)
 );
 
 typedef struct IntermediaryCode {
+  Label* label;
   IntermediaryCodeInstruction instruction;
   struct IntermediaryCode* next;
 } IntermediaryCode;
