@@ -77,6 +77,11 @@ StatementList* from_statement(Statement statement) {
 }
 
 IntermediaryCode* make_intermediary_code_expression(Expression expr, Storage* result) {
+  // HACK: These two cases name their storage as custom values
+  if (!MATCHES(expr, LiteralExpression) && !MATCHES(expr, IdentifierExpression)) {
+    *result = next_storage();
+  }
+
   match(expr) {
     of(LiteralExpression, literal) {
       char buffer[256];
@@ -91,10 +96,44 @@ IntermediaryCode* make_intermediary_code_expression(Expression expr, Storage* re
       *result = strdup(buffer);
       return make_ic(ICNoop()); // TODO: This won't be a noop in the future
     }
+    of(IdentifierExpression, identifier) {
+      *result = strdup(*identifier); // HACK: Name the storage for identifier the same as their name
+      return make_ic(ICNoop());      // TODO: This won't be a noop in the future
+    }
+    of(ReadArrayExpression, identifier, index_expression) {
+      Storage index_result = NULL;
+      IntermediaryCode* index_code = make_intermediary_code_expression(**index_expression, &index_result);
+      IntermediaryCode* read_code = make_ic(ICCopyFrom(*result, *identifier, index_result));
 
-    otherwise {
-      *result = next_storage();
-      return make_ic(ICNoop()); // TODO: Implement
+      return concat_ic(index_code, read_code);
+    }
+    of(FunctionCallExpression, function_identifier, arguments) {
+      IntermediaryCode* call_result = NULL;
+
+      ArgumentList* arguments_list = *arguments;
+      while (arguments_list != NULL) {
+        Storage arg_result = NULL;
+
+        call_result = concat_ic(call_result, make_intermediary_code_expression(arguments_list->argument, &arg_result));
+        // TODO: Copy expression result to function arg. This requires the declarations
+        // call_result = concat_ic(result, make_ic(ICCopy()))
+
+        arguments_list = arguments_list->next;
+      }
+
+      return concat_ic(call_result, make_ic(ICCall(*function_identifier, *result)));
+    }
+    of(InputExpression, type) { return make_ic(ICInput(*type, *result)); }
+    of(BinaryExpression, operator, left, right) {
+      IntermediaryCode* binop_result = NULL;
+      Storage left_result = NULL;
+      Storage right_result = NULL;
+
+      binop_result = concat_ic(binop_result, make_intermediary_code_expression(**left, &left_result));
+      binop_result = concat_ic(binop_result, make_intermediary_code_expression(**right, &right_result));
+      binop_result = concat_ic(binop_result, make_ic(ICBinOp(*operator, * result, left_result, right_result)));
+
+      return binop_result;
     }
   }
 }
@@ -217,8 +256,37 @@ void print_intermediary_code(IntermediaryCode* code) {
       of(ICJump, label) { printf("JUMP(goto = %s)\n", *label); }
       of(ICJumpIfFalse, storage, label) { printf("JUMP_IF_FALSE(read = %s, goto = %s)\n", *storage, *label); }
       of(ICCopy, dst, src) { printf("COPY(destination = %s, source = %s)\n", *dst, *src); }
-      of(ICCopyAt, dst, idx, src) {
-        printf("COPY_TO_ARRAY(destination = %s, index = %s, source = %s)\n", *dst, *idx, *src);
+      of(ICCopyAt, dst, idx, src) { printf("COPY_TO_ARRAY(destination = %s[%s], source = %s)\n", *dst, *idx, *src); }
+      of(ICCopyFrom, dst, src, idx) {
+        printf("COPY_FROM_ARRAY(destination = %s, source = %s[%s])\n", *dst, *src, *idx);
+      }
+      of(ICCall, name, dst) printf("CALL(identifier = %s, destination = %s)\n", *name, *dst);
+      of(ICInput, type, dst) {
+        printf("INPUT(type = ");
+        match(*type) {
+          of(IntegerType) printf("INT");
+          of(FloatType) printf("FLOAT");
+          of(CharType) printf("CHAR");
+        }
+        printf(", destination = %s)\n", *dst);
+      }
+      of(ICBinOp, operator, dst, left, right) {
+        match(*operator) {
+          of(SumOperator) printf("SUM");
+          of(SubtractionOperator) printf("SUB");
+          of(MultiplicationOperator) printf("MUL");
+          of(DivisionOperator) printf("DIV");
+          of(LessThanOperator) printf("LT");
+          of(GreaterThanOperator) printf("GT");
+          of(AndOperator) printf("AND");
+          of(OrOperator) printf("OR");
+          of(NotOperator) printf("NOT");
+          of(LessOrEqualOperator) printf("LE");
+          of(GreaterOrEqualOperator) printf("GE");
+          of(EqualsOperator) printf("EQUALS");
+          of(DiffersOperator) printf("DIFFERS");
+        }
+        printf("(destination = %s, operand_left = %s, operand_right = %s)\n", *dst, *left, *right);
       }
     }
 

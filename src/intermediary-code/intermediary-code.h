@@ -11,7 +11,9 @@ typedef char* Storage;
 
 datatype(
     IC, (ICNoop), (ICVariable, Storage, Literal), (ICArrayVariable, Storage, ArrayInitialization*), (ICJump, Label),
-    (ICJumpIfFalse, Storage, Label), (ICCopy, Storage, Storage), (ICCopyAt, Storage, Storage, Storage)
+    (ICJumpIfFalse, Storage, Label), (ICCopy, Storage, Storage), (ICCopyAt, Storage, Storage, Storage),
+    (ICCopyFrom, Storage, Storage, Storage), (ICCall, Identifier, Storage), (ICInput, Type, Storage),
+    (ICBinOp, BinaryOperator, Storage, Storage, Storage)
 );
 
 typedef struct IntermediaryCode {
