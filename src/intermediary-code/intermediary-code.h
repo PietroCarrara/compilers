@@ -7,23 +7,20 @@
 #include <stdio.h>
 
 typedef char* Label;
+typedef char* Storage;
 
-// TODO: Get rid of Jumps (and therefore labels). Use high level constructs, let the printing handle the labels.
-// Maybe don't even have this? Just print directly from the AST?
 datatype(
-    IntermediaryCodeInstruction, (CodeDeclaration, Declaration), (CodeLoad, Identifier), (CodeStore, Identifier),
-    (CodeReturnValue), (CodeReturn), (CodeRead, Type), (CodePrint), (CodeLoadArray, Identifier),
-    (CodeStoreArray, Identifier), (CodeBinary, BinaryOperator), (CodeJump, Label*), (CodeJumpIfFalse, Label*),
-    (CodeCall, Label*, ArgumentList*), (CodeNop)
+    IC, (ICNoop), (ICVariable, Storage, Literal), (ICArrayVariable, Storage, ArrayInitialization*), (ICJump, Label),
+    (ICJumpIfFalse, Storage, Label), (ICCopy, Storage, Storage), (ICCopyAt, Storage, Storage, Storage)
 );
 
 typedef struct IntermediaryCode {
-  Label* label;
-  IntermediaryCodeInstruction instruction;
   struct IntermediaryCode* next;
+  Label label;
+  IC instruction;
 } IntermediaryCode;
 
-IntermediaryCode* make_intermediary_code(Program program);
-void print_intermediary_code(FILE* out, IntermediaryCode* code);
+IntermediaryCode* intemediary_code_from_program(Program);
+void print_intermediary_code(IntermediaryCode*);
 
 #endif

@@ -34,14 +34,13 @@ int main(int argc, char** argv) {
   SemanticErrorList* list = verify_program(yyprogram);
   if (list != NULL) {
     while (list != NULL) {
-      printf("erro: %s\n", list->error.message);
+      printf("warning: %s\n", list->error.message);
       list = list->next;
     }
-    return 4;
   }
 
-  IntermediaryCode* ic = make_intermediary_code(program);
-  print_intermediary_code(stdout, ic);
+  IntermediaryCode* ic = intemediary_code_from_program(yyprogram);
+  print_intermediary_code(ic);
 
   return 0;
 }
