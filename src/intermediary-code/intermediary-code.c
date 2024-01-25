@@ -196,7 +196,7 @@ IntermediaryCode* make_intermediary_code(const StatementList* current) {
       IntermediaryCode* condition = make_intermediary_code_expression(*cond, &condition_result);
       IntermediaryCode* true_branch = make_intermediary_code(from_statement(**true_statement));
       IntermediaryCode* false_branch =
-          with_label(make_intermediary_code(from_statement(**true_statement)), next_label());
+          with_label(make_intermediary_code(from_statement(**false_statement)), next_label());
       IntermediaryCode* rest = with_label(make_intermediary_code(current->next), next_label());
 
       IntermediaryCode* result = NULL;
