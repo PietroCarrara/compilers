@@ -13,7 +13,9 @@ datatype(
     IC, (ICNoop), (ICVariable, Storage, Literal), (ICArrayVariable, Storage, ArrayInitialization*), (ICJump, Label),
     (ICJumpIfFalse, Storage, Label), (ICCopy, Storage, Storage), (ICCopyAt, Storage, Storage, Storage),
     (ICCopyFrom, Storage, Storage, Storage), (ICCall, Identifier, Storage), (ICInput, Type, Storage),
-    (ICBinOp, BinaryOperator, Storage, Storage, Storage), (ICPrint, Storage), (ICReturn, Storage)
+    (ICBinOp, BinaryOperator, Storage, Storage, Storage), (ICPrint, Storage), (ICReturn, Storage),
+    // TODO: Do I really need these ones?
+    (ICFunctionBegin, Identifier), (ICFunctionEnd)
 );
 
 typedef struct IntermediaryCode {

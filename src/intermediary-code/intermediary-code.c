@@ -267,9 +267,11 @@ IntermediaryCode* intemediary_code_from_program(Program program) {
 
   ImplementationList* implementations = program.implementations;
   while (implementations != NULL) {
+    result = concat_ic(result, make_ic(ICFunctionBegin(implementations->implementation.name)));
     result = concat_ic(
         result, make_intermediary_code(from_statement(implementations->implementation.body), program.declarations)
     );
+    result = concat_ic(result, make_ic(ICFunctionEnd()));
     implementations = implementations->next;
   }
 
@@ -286,6 +288,8 @@ void print_intermediary_code(IntermediaryCode* code) {
       of(ICNoop) { }
       of(ICVariable) { }
       of(ICArrayVariable) { }
+      of(ICFunctionBegin, name) printf("FUNCTION_BEGIN(name = %s)\n", *name);
+      of(ICFunctionEnd) printf("FUNCTION_END()\n");
       of(ICJump, label) { printf("JUMP(goto = %s)\n", *label); }
       of(ICJumpIfFalse, storage, label) { printf("JUMP_IF_FALSE(read = %s, goto = %s)\n", *storage, *label); }
       of(ICCopy, dst, src) { printf("COPY(destination = %s, source = %s)\n", *dst, *src); }
