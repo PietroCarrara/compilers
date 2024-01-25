@@ -13,4 +13,7 @@ typedef struct SemanticErrorList {
 
 SemanticErrorList* verify_program(Program Program);
 
+datatype(DeclarationSearchResult, (DeclarationNotFound), (DeclarationFound, Declaration, Type, Identifier));
+DeclarationSearchResult find_declaration(Identifier target, DeclarationList* declarations);
+
 #endif

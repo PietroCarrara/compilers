@@ -1,5 +1,6 @@
 #include "intermediary-code.h"
 
+#include "semantic-check.h"
 #include "syntax-tree.h"
 
 #include <stdlib.h>
@@ -76,7 +77,7 @@ StatementList* from_statement(Statement statement) {
   return NULL;
 }
 
-IntermediaryCode* make_intermediary_code_expression(Expression expr, Storage* result) {
+IntermediaryCode* make_intermediary_code_expression(Expression expr, Storage* result, DeclarationList* declarations) {
   // HACK: These two cases name their storage as custom values
   if (!MATCHES(expr, LiteralExpression) && !MATCHES(expr, IdentifierExpression)) {
     *result = next_storage();
@@ -102,26 +103,37 @@ IntermediaryCode* make_intermediary_code_expression(Expression expr, Storage* re
     }
     of(ReadArrayExpression, identifier, index_expression) {
       Storage index_result = NULL;
-      IntermediaryCode* index_code = make_intermediary_code_expression(**index_expression, &index_result);
+      IntermediaryCode* index_code = make_intermediary_code_expression(**index_expression, &index_result, declarations);
       IntermediaryCode* read_code = make_ic(ICCopyFrom(*result, *identifier, index_result));
 
       return concat_ic(index_code, read_code);
     }
     of(FunctionCallExpression, function_identifier, arguments) {
-      IntermediaryCode* call_result = NULL;
+      DeclarationSearchResult search_function = find_declaration(*function_identifier, declarations);
+      match(search_function) {
+        of(DeclarationFound, declaration) {
+          match(*declaration) {
+            of(FunctionDeclaration, _, _, params) {
+              IntermediaryCode* call_result = NULL;
 
-      ArgumentList* arguments_list = *arguments;
-      while (arguments_list != NULL) {
-        Storage arg_result = NULL;
+              ArgumentList* arguments_list = *arguments;
+              ParametersDeclaration* parameters_list = *params;
+              while (arguments_list != NULL && parameters_list != NULL) {
+                Storage arg_result = NULL;
 
-        call_result = concat_ic(call_result, make_intermediary_code_expression(arguments_list->argument, &arg_result));
-        // TODO: Copy expression result to function arg. This requires the declarations
-        // call_result = concat_ic(result, make_ic(ICCopy()))
+                call_result = concat_ic(
+                    call_result, make_intermediary_code_expression(arguments_list->argument, &arg_result, declarations)
+                );
+                call_result = concat_ic(call_result, make_ic(ICCopy(parameters_list->name, arg_result)));
 
-        arguments_list = arguments_list->next;
+                arguments_list = arguments_list->next;
+                parameters_list = parameters_list->next;
+              }
+              return concat_ic(call_result, make_ic(ICCall(*function_identifier, *result)));
+            }
+          }
+        }
       }
-
-      return concat_ic(call_result, make_ic(ICCall(*function_identifier, *result)));
     }
     of(InputExpression, type) { return make_ic(ICInput(*type, *result)); }
     of(BinaryExpression, operator, left, right) {
@@ -129,8 +141,8 @@ IntermediaryCode* make_intermediary_code_expression(Expression expr, Storage* re
       Storage left_result = NULL;
       Storage right_result = NULL;
 
-      binop_result = concat_ic(binop_result, make_intermediary_code_expression(**left, &left_result));
-      binop_result = concat_ic(binop_result, make_intermediary_code_expression(**right, &right_result));
+      binop_result = concat_ic(binop_result, make_intermediary_code_expression(**left, &left_result, declarations));
+      binop_result = concat_ic(binop_result, make_intermediary_code_expression(**right, &right_result, declarations));
       binop_result = concat_ic(binop_result, make_ic(ICBinOp(*operator, * result, left_result, right_result)));
 
       return binop_result;
@@ -138,7 +150,7 @@ IntermediaryCode* make_intermediary_code_expression(Expression expr, Storage* re
   }
 }
 
-IntermediaryCode* make_intermediary_code(const StatementList* current) {
+IntermediaryCode* make_intermediary_code(const StatementList* current, DeclarationList* declarations) {
   if (current == NULL) {
     return make_ic(ICNoop());
   }
@@ -146,8 +158,8 @@ IntermediaryCode* make_intermediary_code(const StatementList* current) {
   match(current->statement) {
     of(AssignmentStatement, identifier, expr) {
       Storage expr_result;
-      IntermediaryCode* expression = make_intermediary_code_expression(*expr, &expr_result);
-      IntermediaryCode* rest = make_intermediary_code(current->next);
+      IntermediaryCode* expression = make_intermediary_code_expression(*expr, &expr_result, declarations);
+      IntermediaryCode* rest = make_intermediary_code(current->next, declarations);
 
       IntermediaryCode* result = NULL;
       result = concat_ic(result, expression);
@@ -157,11 +169,12 @@ IntermediaryCode* make_intermediary_code(const StatementList* current) {
     }
     of(ArrayAssignmentStatement, identifier, index_expr, expr) {
       Storage expr_result;
-      IntermediaryCode* expression = make_intermediary_code_expression(*expr, &expr_result);
+      IntermediaryCode* expression = make_intermediary_code_expression(*expr, &expr_result, declarations);
       Storage index_expr_result;
-      IntermediaryCode* index_expression = make_intermediary_code_expression(*index_expr, &index_expr_result);
+      IntermediaryCode* index_expression =
+          make_intermediary_code_expression(*index_expr, &index_expr_result, declarations);
 
-      IntermediaryCode* rest = make_intermediary_code(current->next);
+      IntermediaryCode* rest = make_intermediary_code(current->next, declarations);
 
       IntermediaryCode* result = NULL;
       result = concat_ic(result, expression);
@@ -170,19 +183,33 @@ IntermediaryCode* make_intermediary_code(const StatementList* current) {
       result = concat_ic(result, rest);
       return result;
     }
-    of(PrintStatement) {
-      // TODO: Implement
-      return make_intermediary_code(current->next);
+    of(PrintStatement, expr) {
+      Storage expr_result;
+      IntermediaryCode* expression = make_intermediary_code_expression(*expr, &expr_result, declarations);
+      IntermediaryCode* rest = make_intermediary_code(current->next, declarations);
+
+      IntermediaryCode* result = NULL;
+      result = concat_ic(result, expression);
+      result = concat_ic(result, make_ic(ICPrint(expr_result)));
+      result = concat_ic(result, rest);
+      return result;
     }
-    of(ReturnStatement) {
-      // TODO: Implement
-      return make_intermediary_code(current->next);
+    of(ReturnStatement, expr) {
+      Storage expr_result;
+      IntermediaryCode* expression = make_intermediary_code_expression(*expr, &expr_result, declarations);
+      IntermediaryCode* rest = make_intermediary_code(current->next, declarations);
+
+      IntermediaryCode* result = NULL;
+      result = concat_ic(result, expression);
+      result = concat_ic(result, make_ic(ICReturn(expr_result)));
+      result = concat_ic(result, rest);
+      return result;
     }
     of(IfStatement, cond, true_statement) {
       Storage condition_result;
-      IntermediaryCode* condition = make_intermediary_code_expression(*cond, &condition_result);
-      IntermediaryCode* true_branch = make_intermediary_code(from_statement(**true_statement));
-      IntermediaryCode* rest = with_label(make_intermediary_code(current->next), next_label());
+      IntermediaryCode* condition = make_intermediary_code_expression(*cond, &condition_result, declarations);
+      IntermediaryCode* true_branch = make_intermediary_code(from_statement(**true_statement), declarations);
+      IntermediaryCode* rest = with_label(make_intermediary_code(current->next, declarations), next_label());
 
       IntermediaryCode* result = NULL;
       result = concat_ic(result, condition);
@@ -193,11 +220,11 @@ IntermediaryCode* make_intermediary_code(const StatementList* current) {
     }
     of(IfElseStatement, cond, true_statement, false_statement) {
       Storage condition_result;
-      IntermediaryCode* condition = make_intermediary_code_expression(*cond, &condition_result);
-      IntermediaryCode* true_branch = make_intermediary_code(from_statement(**true_statement));
+      IntermediaryCode* condition = make_intermediary_code_expression(*cond, &condition_result, declarations);
+      IntermediaryCode* true_branch = make_intermediary_code(from_statement(**true_statement), declarations);
       IntermediaryCode* false_branch =
-          with_label(make_intermediary_code(from_statement(**false_statement)), next_label());
-      IntermediaryCode* rest = with_label(make_intermediary_code(current->next), next_label());
+          with_label(make_intermediary_code(from_statement(**false_statement), declarations), next_label());
+      IntermediaryCode* rest = with_label(make_intermediary_code(current->next, declarations), next_label());
 
       IntermediaryCode* result = NULL;
       result = concat_ic(result, condition);
@@ -211,9 +238,9 @@ IntermediaryCode* make_intermediary_code(const StatementList* current) {
     of(WhileStatement, cond, body) {
       Storage condition_result;
       IntermediaryCode* condition =
-          with_label(make_intermediary_code_expression(*cond, &condition_result), next_label());
-      IntermediaryCode* loop_body = make_intermediary_code(from_statement(**body));
-      IntermediaryCode* rest = with_label(make_intermediary_code(current->next), next_label());
+          with_label(make_intermediary_code_expression(*cond, &condition_result, declarations), next_label());
+      IntermediaryCode* loop_body = make_intermediary_code(from_statement(**body), declarations);
+      IntermediaryCode* rest = with_label(make_intermediary_code(current->next, declarations), next_label());
 
       IntermediaryCode* result = NULL;
       result = concat_ic(result, condition);
@@ -223,8 +250,12 @@ IntermediaryCode* make_intermediary_code(const StatementList* current) {
       result = concat_ic(result, rest);
       return result;
     }
-    of(BlockStatement, list) { return concat_ic(make_intermediary_code(*list), make_intermediary_code(current->next)); }
-    of(EmptyStatement) { return make_intermediary_code(current->next); }
+    of(BlockStatement, list) {
+      return concat_ic(
+          make_intermediary_code(*list, declarations), make_intermediary_code(current->next, declarations)
+      );
+    }
+    of(EmptyStatement) { return make_intermediary_code(current->next, declarations); }
   }
 
   // Should never happen
@@ -236,7 +267,9 @@ IntermediaryCode* intemediary_code_from_program(Program program) {
 
   ImplementationList* implementations = program.implementations;
   while (implementations != NULL) {
-    result = concat_ic(result, make_intermediary_code(from_statement(implementations->implementation.body)));
+    result = concat_ic(
+        result, make_intermediary_code(from_statement(implementations->implementation.body), program.declarations)
+    );
     implementations = implementations->next;
   }
 
@@ -270,6 +303,8 @@ void print_intermediary_code(IntermediaryCode* code) {
         }
         printf(", destination = %s)\n", *dst);
       }
+      of(ICPrint, src) printf("PRINT(src = %s)\n", *src);
+      of(ICReturn, src) printf("RETURN(src = %s)\n", *src);
       of(ICBinOp, operator, dst, left, right) {
         match(*operator) {
           of(SumOperator) printf("SUM");

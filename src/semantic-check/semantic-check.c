@@ -26,7 +26,6 @@ SemanticErrorList* concat_errors(SemanticErrorList* a, SemanticErrorList* b) {
   return a;
 }
 
-datatype(DeclarationSearchResult, (DeclarationNotFound), (DeclarationFound, Declaration, Type, Identifier));
 datatype(ImplementationSearchResult, (ImplementationNotFound), (ImplementationFound, Implementation));
 
 DeclarationSearchResult find_declaration(Identifier target, DeclarationList* declarations) {

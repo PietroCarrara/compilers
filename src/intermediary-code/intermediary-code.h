@@ -13,7 +13,7 @@ datatype(
     IC, (ICNoop), (ICVariable, Storage, Literal), (ICArrayVariable, Storage, ArrayInitialization*), (ICJump, Label),
     (ICJumpIfFalse, Storage, Label), (ICCopy, Storage, Storage), (ICCopyAt, Storage, Storage, Storage),
     (ICCopyFrom, Storage, Storage, Storage), (ICCall, Identifier, Storage), (ICInput, Type, Storage),
-    (ICBinOp, BinaryOperator, Storage, Storage, Storage)
+    (ICBinOp, BinaryOperator, Storage, Storage, Storage), (ICPrint, Storage), (ICReturn, Storage)
 );
 
 typedef struct IntermediaryCode {
