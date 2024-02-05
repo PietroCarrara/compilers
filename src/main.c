@@ -1,3 +1,4 @@
+#include "asm.h"
 #include "format.h"
 #include "intermediary-code.h"
 #include "semantic-check.h"
@@ -39,8 +40,7 @@ int main(int argc, char** argv) {
     }
   }
 
-  IntermediaryCode* ic = intemediary_code_from_program(yyprogram);
-  print_intermediary_code(ic);
+  write_asm(yyprogram, stdout);
 
   return 0;
 }
