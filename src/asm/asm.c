@@ -1,5 +1,7 @@
 #include "asm.h"
 
+#include "intermediary-code.h"
+
 #define space()      fprintf(out, " ")
 #define tabs(n)      fprintf(out, "%*s", (n)*TAB_SIZE, "")
 #define character(c) fprintf(out, "%c", c)
@@ -28,7 +30,6 @@ void write_declarations(DeclarationList* declarations, FILE* out) {
   while (declarations != NULL) {
     match(declarations->declaration) {
       of(VariableDeclaration, type, identifier, value) {
-        string("_");
         string(*identifier);
         string(": ");
         print_type(*type, out);
@@ -63,16 +64,126 @@ void write_declarations(DeclarationList* declarations, FILE* out) {
   }
 }
 
+// HACK: Huuuge hack to declare string literals
+extern StringDeclarationList* string_constants;
+
+void write_string_literals(FILE* out) {
+  StringDeclarationList* list = string_constants;
+  while (list != NULL) {
+    fprintf(out, "%s: .string \"%s\"", list->identifier, list->value);
+
+    list = list->next;
+  }
+}
+
+void write_intermediary_code(IntermediaryCode* code, FILE* out) {
+  while (code != NULL) {
+    if (code->label != NULL) {
+      string(code->label);
+      string(": ");
+    }
+
+    match(code->instruction) {
+      of(ICNoop) { }
+      of(ICFunctionBegin, name) {
+        string(*name);
+        string(": ");
+      }
+      of(ICFunctionEnd) string("retq # Function end\n\n");
+      of(ICJump, label) fprintf(out, "jmp %s\n", *label);
+      of(ICJumpIfFalse, storage, label) {
+        fprintf(out, "mov %s, %%r10\n", *storage);
+        fprintf(out, "test %%r10, %%r10\n");
+        fprintf(out, "jne %s\n", *label);
+      }
+      of(ICCopy, dst, src) {
+        fprintf(out, "mov %s, %%r10\n", *src);
+        fprintf(out, "mov %%r10, %s\n", *dst);
+      }
+      of(ICCopyAt, dst, idx, src) {
+        fprintf(out, "mov $%s, %%r10\n", *dst);
+        fprintf(out, "mov %s, %%r11\n", *idx);
+        fprintf(out, "mov %s, %%r11(%%r10)\n", *src);
+      }
+      of(ICCopyFrom, dst, src, idx) {
+        fprintf(out, "mov $%s, %%r10\n", *src);
+        fprintf(out, "mov %s, %%r11\n", *idx);
+        fprintf(out, "mov %%r11(%%r10)\n, %s", *dst);
+      }
+      of(ICCall, name, dst) {
+        fprintf(out, "call %s\n", *name);
+        fprintf(out, "mov %%rax, %s\n", *dst); // TODO: Is this enough? Maybe we need per-type return values?
+      }
+      of(ICInput, type, dst) {
+        // TODO
+        printf("INPUT(type = ");
+        match(*type) {
+          of(IntegerType) printf("INT");
+          of(FloatType) printf("FLOAT");
+          of(CharType) printf("CHAR");
+        }
+        printf(", destination = %s)\n", *dst);
+      }
+      of(ICPrint, src) printf("PRINT(src = %s)\n", *src); // TODO
+      of(ICReturn, src) {
+        fprintf(out, "mov %s, %%rax\n", *src);
+        fprintf(out, "retq\n");
+      }
+      of(ICBinOp, operator, dst, left, right) {
+        fprintf(out, "mov %s, %%r10\n", *left);
+
+        match(*operator) {
+          of(SumOperator) fprintf(out, "add %s, %%r10\n", *right);
+          of(SubtractionOperator) fprintf(out, "sub %s, %%r10\n", *right);
+          of(MultiplicationOperator) fprintf(out, "imul %s, %%r10\n", *right);
+          of(DivisionOperator) printf("DIV");
+          of(LessThanOperator) printf("LT");
+          of(GreaterThanOperator) printf("GT");
+          of(AndOperator) printf("AND");
+          of(OrOperator) printf("OR");
+          of(NotOperator) printf("NOT");
+          of(LessOrEqualOperator) printf("LE");
+          of(GreaterOrEqualOperator) printf("GE");
+          of(EqualsOperator) printf("EQUALS");
+          of(DiffersOperator) printf("DIFFERS");
+        }
+        fprintf(out, "mov %%r10, %s\n", *dst);
+      }
+    }
+
+    code = code->next;
+  }
+}
+
+void write_storage(IntermediaryCode* code, FILE* out) {
+  while (code != NULL) {
+    match(code->instruction) {
+      of(ICCall, name, dst) fprintf(out, "%s: .int 0\n", *dst);
+      of(ICInput, type, dst) fprintf(out, "%s: .int 0\n", *dst);
+      of(ICBinOp, operator, dst, left, right) fprintf(out, "%s: .int 0\n", *dst);
+    }
+
+    code = code->next;
+  }
+}
+
 void write_asm(Program program, FILE* out) {
+  IntermediaryCode* ic = intemediary_code_from_program(program);
+
   string(".global main\n");
   string("\n");
 
+  string(".data\n");
   write_declarations(program.declarations, out);
+  string("\n");
+  write_string_literals(out);
+  string("\n");
+  write_storage(ic, out);
   string("\n");
 
   string(".text\n");
-  // TODO: ASM functions here
+  write_intermediary_code(ic, out);
   string("\n");
 
-  string(".section \".note.GNU - stack \",\"\",@progbits\n");
+  string(".section \".note.GNU-stack\",\"\",@progbits\n");
 }

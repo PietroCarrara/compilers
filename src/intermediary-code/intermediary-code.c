@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+StringDeclarationList* string_constants = NULL;
+
 Label next_label() {
   static int current_label = 0;
 
@@ -89,11 +91,28 @@ IntermediaryCode* make_intermediary_code_expression(Expression expr, Storage* re
 
       // HACK: Name the storage for literals the same as their formatted value
       match(*literal) {
-        of(IntLiteral, i) snprintf(buffer, sizeof(buffer), "%d", *i);
-        of(FloatLiteral, f) snprintf(buffer, sizeof(buffer), "%g", *f);
-        of(CharLiteral, c) snprintf(buffer, sizeof(buffer), "'%c'", *c);
-        of(StringLiteral, s) snprintf(buffer, sizeof(buffer), "\"%s\"", *s);
-      };
+        of(IntLiteral, i) snprintf(buffer, sizeof(buffer), "$%d", *i);
+        of(FloatLiteral, f) snprintf(buffer, sizeof(buffer), "$%g", *f);
+        of(CharLiteral, c) snprintf(buffer, sizeof(buffer), "$'%c'", *c);
+        of(StringLiteral, s) {
+          Storage storage = next_storage();
+          snprintf(buffer, sizeof(buffer), "%s", storage);
+
+          // HACK: Register string constant on global list
+          StringDeclarationList declaration = { .identifier = storage, .value = *s, .next = NULL };
+          StringDeclarationList* tail = string_constants;
+          while (string_constants != NULL && tail->next != NULL) {
+            tail = tail->next;
+          }
+          if (string_constants == NULL) {
+            string_constants = malloc(sizeof(StringDeclarationList));
+            *string_constants = declaration;
+          } else {
+            tail->next = malloc(sizeof(StringDeclarationList));
+            *(tail->next) = declaration;
+          }
+        }
+      }
       *result = strdup(buffer);
       return make_ic(ICNoop()); // TODO: This won't be a noop in the future
     }
@@ -286,8 +305,6 @@ void print_intermediary_code(IntermediaryCode* code) {
 
     match(code->instruction) {
       of(ICNoop) { }
-      of(ICVariable) { }
-      of(ICArrayVariable) { }
       of(ICFunctionBegin, name) printf("FUNCTION_BEGIN(name = %s)\n", *name);
       of(ICFunctionEnd) printf("FUNCTION_END()\n");
       of(ICJump, label) { printf("JUMP(goto = %s)\n", *label); }
