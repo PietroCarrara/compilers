@@ -126,20 +126,26 @@ void write_intermediary_code(IntermediaryCode* code, FILE* out) {
         fprintf(out, "mov %%eax, %s\n", *dst); // TODO: Is this enough? Maybe we need per-type return values?
       }
       of(ICInput, type, dst) {
-        // TODO
-        printf("INPUT(type = ");
+        char* format = NULL;
         match(*type) {
-          of(IntegerType) printf("INT");
-          of(FloatType) printf("FLOAT");
-          of(CharType) printf("CHAR");
+          of(IntegerType) format = "percent_d";
+          of(FloatType) format = "percent_f";
+          of(CharType) format = "percent_c";
         }
-        printf(", destination = %s)\n", *dst);
+        fprintf(out, "pushq %%rbp\n"); // Setup a stack frame
+        fprintf(out, "leaq %s(%%rip), %%rdi\n", format);
+        fprintf(out, "movq %s@GOTPCREL(%%rip), %%rsi\n", *dst);
+        fprintf(out, "movb $0, %%al\n");
+        fprintf(out, "callq __isoc99_scanf@PLT\n");
+        fprintf(out, "popq %%rbp\n");
       }
       of(ICPrint, src) {
+        fprintf(out, "pushq %%rbp\n"); // Setup a stack frame
         fprintf(out, "leaq percent_s(%%rip), %%rdi\n");
         fprintf(out, "leaq %s(%%rip), %%rsi\n", *src);
         fprintf(out, "movb $0, %%al\n");
         fprintf(out, "callq printf@PLT\n");
+        fprintf(out, "popq %%rbp\n");
       }
       of(ICReturn, src) {
         fprintf(out, "mov %s, %%eax\n", *src);
@@ -174,11 +180,23 @@ void write_intermediary_code(IntermediaryCode* code, FILE* out) {
             fprintf(out, "seta %%al\n");
             fprintf(out, "mov %%eax, %%r10d\n");
           }
-          of(AndOperator) printf("AND");
-          of(OrOperator) printf("OR");
-          of(NotOperator) printf("NOT");
-          of(LessOrEqualOperator) printf("LE");
-          of(GreaterOrEqualOperator) printf("GE");
+          of(AndOperator) fprintf(out, "and %s, %%r10d\n", *right);
+          of(OrOperator) fprintf(out, "or %s, %%r10d\n", *right);
+          of(NotOperator) fprintf(out, "xor %s, %%r10d\n", *right);
+          of(LessOrEqualOperator) {
+            fprintf(out, "mov %s, %%r11d\n", *right);
+            fprintf(out, "cmp %%r11d, %%r10d\n");
+            fprintf(out, "mov $0, %%eax\n");
+            fprintf(out, "setle %%al\n");
+            fprintf(out, "mov %%eax, %%r10d\n");
+          }
+          of(GreaterOrEqualOperator) {
+            fprintf(out, "mov %s, %%r11d\n", *right);
+            fprintf(out, "cmp %%r11d, %%r10d\n");
+            fprintf(out, "mov $0, %%eax\n");
+            fprintf(out, "setge %%al\n");
+            fprintf(out, "mov %%eax, %%r10d\n");
+          };
           of(EqualsOperator) {
             fprintf(out, "mov %s, %%r11d\n", *right);
             fprintf(out, "cmp %%r11d, %%r10d\n");
@@ -186,7 +204,13 @@ void write_intermediary_code(IntermediaryCode* code, FILE* out) {
             fprintf(out, "sete %%al\n");
             fprintf(out, "mov %%eax, %%r10d\n");
           }
-          of(DiffersOperator) printf("DIFFERS");
+          of(DiffersOperator) {
+            fprintf(out, "mov %s, %%r11d\n", *right);
+            fprintf(out, "cmp %%r11d, %%r10d\n");
+            fprintf(out, "mov $0, %%eax\n");
+            fprintf(out, "setne %%al\n");
+            fprintf(out, "mov %%eax, %%r10d\n");
+          };
         }
         fprintf(out, "mov %%r10d, %s\n", *dst);
       }
@@ -221,7 +245,10 @@ void write_asm(Program program, FILE* out) {
   string("\n");
   write_storage(ic, out);
   string("\n");
-  string("percent_s: .asciz \"%s\"");
+  string("percent_s: .asciz \"%s\"\n");
+  string("percent_d: .asciz \"%d\"\n");
+  string("percent_f: .asciz \"%f\"\n");
+  string("percent_c: .asciz \"%c\"\n");
   string("\n");
 
   string(".text\n");
