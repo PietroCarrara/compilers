@@ -81,7 +81,7 @@ extern StringDeclarationList* string_constants;
 void write_string_literals(FILE* out) {
   StringDeclarationList* list = string_constants;
   while (list != NULL) {
-    fprintf(out, "%s: .string \"%s\"\n", list->identifier, list->value);
+    fprintf(out, "%s: .asciz \"%s\"\n", list->identifier, list->value);
 
     list = list->next;
   }
@@ -103,27 +103,27 @@ void write_intermediary_code(IntermediaryCode* code, FILE* out) {
       of(ICFunctionEnd) string("retq # Function end\n\n");
       of(ICJump, label) fprintf(out, "jmp %s\n", *label);
       of(ICJumpIfFalse, storage, label) {
-        fprintf(out, "mov %s, %%r10\n", *storage);
-        fprintf(out, "test %%r10, %%r10\n");
-        fprintf(out, "jz %s\n", *label);
+        fprintf(out, "mov %s, %%r10d\n", *storage);
+        fprintf(out, "test %%r10d, %%r10d\n");
+        fprintf(out, "je %s\n", *label);
       }
       of(ICCopy, dst, src) {
-        fprintf(out, "mov %s, %%r10\n", *src);
-        fprintf(out, "mov %%r10, %s\n", *dst);
+        fprintf(out, "mov %s, %%r10d\n", *src);
+        fprintf(out, "mov %%r10d, %s\n", *dst);
       }
       of(ICCopyAt, dst, idx, src) {
-        fprintf(out, "mov $%s, %%r10\n", *dst);
-        fprintf(out, "mov %s, %%r11\n", *idx);
-        fprintf(out, "mov %s, %%r11(%%r10)\n", *src);
+        fprintf(out, "mov $%s, %%r10d\n", *dst);
+        fprintf(out, "mov %s, %%r11d\n", *idx);
+        fprintf(out, "mov %s, %%r11d(%%r10d)\n", *src);
       }
       of(ICCopyFrom, dst, src, idx) {
-        fprintf(out, "mov $%s, %%r10\n", *src);
-        fprintf(out, "mov %s, %%r11\n", *idx);
-        fprintf(out, "mov %%r11(%%r10)\n, %s", *dst);
+        fprintf(out, "mov $%s, %%r10d\n", *src);
+        fprintf(out, "mov %s, %%r11d\n", *idx);
+        fprintf(out, "mov %%r11d(%%r10d)\n, %s", *dst);
       }
       of(ICCall, name, dst) {
         fprintf(out, "callq %s\n", *name);
-        fprintf(out, "mov %%rax, %s\n", *dst); // TODO: Is this enough? Maybe we need per-type return values?
+        fprintf(out, "mov %%eax, %s\n", *dst); // TODO: Is this enough? Maybe we need per-type return values?
       }
       of(ICInput, type, dst) {
         // TODO
@@ -135,37 +135,58 @@ void write_intermediary_code(IntermediaryCode* code, FILE* out) {
         }
         printf(", destination = %s)\n", *dst);
       }
-      of(ICPrint, src) printf("PRINT(src = %s)\n", *src); // TODO
+      of(ICPrint, src) {
+        fprintf(out, "lea %s(%%rip), %%rdi\n", *src);
+        fprintf(out, "callq puts\n");
+      }
       of(ICReturn, src) {
-        fprintf(out, "mov %s, %%rax\n", *src);
+        fprintf(out, "mov %s, %%eax\n", *src);
         fprintf(out, "retq\n");
       }
       of(ICBinOp, operator, dst, left, right) {
-        fprintf(out, "mov %s, %%r10\n", *left);
+        fprintf(out, "mov %s, %%r10d\n", *left);
 
         match(*operator) {
-          of(SumOperator) fprintf(out, "add %s, %%r10\n", *right);
-          of(SubtractionOperator) fprintf(out, "sub %s, %%r10\n", *right);
-          of(MultiplicationOperator) fprintf(out, "imul %s, %%r10\n", *right);
+          of(SumOperator) fprintf(out, "add %s, %%r10d\n", *right);
+          of(SubtractionOperator) fprintf(out, "sub %s, %%r10d\n", *right);
+          of(MultiplicationOperator) fprintf(out, "imul %s, %%r10d\n", *right);
           of(DivisionOperator) {
-            // FIXME: This is still leaving a leftover mov %r10 before it
+            // FIXME: This is still leaving a leftover mov %r10d before it
             fprintf(out, "mov %s, %%eax\n", *left);
             fprintf(out, "cltd\n");
             fprintf(out, "mov %s, %%r10d\n", *right);
             fprintf(out, "idiv %%r10d\n");
             fprintf(out, "mov %%eax, %%r10d\n");
           }
-          of(LessThanOperator) printf("LT");
-          of(GreaterThanOperator) printf("GT");
+          of(LessThanOperator) {
+            fprintf(out, "mov %s, %%r11d\n", *right);
+            fprintf(out, "cmp %%r11d, %%r10d\n");
+            fprintf(out, "mov $0, %%eax\n");
+            fprintf(out, "setb %%al\n");
+            fprintf(out, "mov %%eax, %%r10d\n");
+          }
+          of(GreaterThanOperator) {
+            fprintf(out, "mov %s, %%r11d\n", *right);
+            fprintf(out, "cmp %%r11d, %%r10d\n");
+            fprintf(out, "mov $0, %%eax\n");
+            fprintf(out, "seta %%al\n");
+            fprintf(out, "mov %%eax, %%r10d\n");
+          }
           of(AndOperator) printf("AND");
           of(OrOperator) printf("OR");
           of(NotOperator) printf("NOT");
           of(LessOrEqualOperator) printf("LE");
           of(GreaterOrEqualOperator) printf("GE");
-          of(EqualsOperator) printf("EQUALS");
+          of(EqualsOperator) {
+            fprintf(out, "mov %s, %%r11d\n", *right);
+            fprintf(out, "cmp %%r11d, %%r10d\n");
+            fprintf(out, "mov $0, %%eax\n");
+            fprintf(out, "sete %%al\n");
+            fprintf(out, "mov %%eax, %%r10d\n");
+          }
           of(DiffersOperator) printf("DIFFERS");
         }
-        fprintf(out, "mov %%r10, %s\n", *dst);
+        fprintf(out, "mov %%r10d, %s\n", *dst);
       }
     }
 

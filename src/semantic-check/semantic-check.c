@@ -748,6 +748,9 @@ DeclarationList* concat_params(ParametersDeclaration* params, DeclarationList* d
 
     params = params->next;
   }
+  if (tail != NULL) {
+    tail->next = declarations;
+  }
 
   return head != NULL ? head : declarations;
 }
