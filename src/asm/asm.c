@@ -136,8 +136,10 @@ void write_intermediary_code(IntermediaryCode* code, FILE* out) {
         printf(", destination = %s)\n", *dst);
       }
       of(ICPrint, src) {
-        fprintf(out, "lea %s(%%rip), %%rdi\n", *src);
-        fprintf(out, "callq puts\n");
+        fprintf(out, "leaq percent_s(%%rip), %%rdi\n");
+        fprintf(out, "leaq %s(%%rip), %%rsi\n", *src);
+        fprintf(out, "movb $0, %%al\n");
+        fprintf(out, "callq printf@PLT\n");
       }
       of(ICReturn, src) {
         fprintf(out, "mov %s, %%eax\n", *src);
@@ -218,6 +220,8 @@ void write_asm(Program program, FILE* out) {
   write_string_literals(out);
   string("\n");
   write_storage(ic, out);
+  string("\n");
+  string("percent_s: .asciz \"%s\"");
   string("\n");
 
   string(".text\n");
