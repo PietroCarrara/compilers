@@ -58,6 +58,17 @@ void write_declarations(DeclarationList* declarations, FILE* out) {
           string("\n");
         }
       }
+      of(FunctionDeclaration, _, _, parameters) {
+        ParametersDeclaration* paramsList = *parameters;
+        while (paramsList != NULL) {
+          string(paramsList->name);
+          string(": ");
+          print_type(paramsList->type, out);
+          string(" 0\n");
+
+          paramsList = paramsList->next;
+        }
+      }
     }
 
     declarations = declarations->next;
@@ -70,7 +81,7 @@ extern StringDeclarationList* string_constants;
 void write_string_literals(FILE* out) {
   StringDeclarationList* list = string_constants;
   while (list != NULL) {
-    fprintf(out, "%s: .string \"%s\"", list->identifier, list->value);
+    fprintf(out, "%s: .string \"%s\"\n", list->identifier, list->value);
 
     list = list->next;
   }
@@ -94,7 +105,7 @@ void write_intermediary_code(IntermediaryCode* code, FILE* out) {
       of(ICJumpIfFalse, storage, label) {
         fprintf(out, "mov %s, %%r10\n", *storage);
         fprintf(out, "test %%r10, %%r10\n");
-        fprintf(out, "jne %s\n", *label);
+        fprintf(out, "jz %s\n", *label);
       }
       of(ICCopy, dst, src) {
         fprintf(out, "mov %s, %%r10\n", *src);
@@ -111,7 +122,7 @@ void write_intermediary_code(IntermediaryCode* code, FILE* out) {
         fprintf(out, "mov %%r11(%%r10)\n, %s", *dst);
       }
       of(ICCall, name, dst) {
-        fprintf(out, "call %s\n", *name);
+        fprintf(out, "callq %s\n", *name);
         fprintf(out, "mov %%rax, %s\n", *dst); // TODO: Is this enough? Maybe we need per-type return values?
       }
       of(ICInput, type, dst) {
@@ -136,7 +147,14 @@ void write_intermediary_code(IntermediaryCode* code, FILE* out) {
           of(SumOperator) fprintf(out, "add %s, %%r10\n", *right);
           of(SubtractionOperator) fprintf(out, "sub %s, %%r10\n", *right);
           of(MultiplicationOperator) fprintf(out, "imul %s, %%r10\n", *right);
-          of(DivisionOperator) printf("DIV");
+          of(DivisionOperator) {
+            // FIXME: This is still leaving a leftover mov %r10 before it
+            fprintf(out, "mov %s, %%eax\n", *left);
+            fprintf(out, "cltd\n");
+            fprintf(out, "mov %s, %%r10d\n", *right);
+            fprintf(out, "idiv %%r10d\n");
+            fprintf(out, "mov %%eax, %%r10d\n");
+          }
           of(LessThanOperator) printf("LT");
           of(GreaterThanOperator) printf("GT");
           of(AndOperator) printf("AND");
