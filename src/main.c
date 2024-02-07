@@ -40,7 +40,7 @@ int main(int argc, char** argv) {
     }
   }
 
-  write_asm(yyprogram, fopen("out.s", "w+"));
+  write_asm(yyprogram, stdout);
 
   return 0;
 }
