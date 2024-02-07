@@ -150,8 +150,10 @@ IntermediaryCode* make_intermediary_code_expression(Expression expr, Storage* re
               }
               return concat_ic(call_result, make_ic(ICCall(*function_identifier, *result)));
             }
+            otherwise { }
           }
         }
+        otherwise { }
       }
     }
     of(InputExpression, type) { return make_ic(ICInput(*type, *result)); }
@@ -167,6 +169,9 @@ IntermediaryCode* make_intermediary_code_expression(Expression expr, Storage* re
       return binop_result;
     }
   }
+
+  // Not supposed to happen
+  return NULL;
 }
 
 IntermediaryCode* make_intermediary_code(const StatementList* current, DeclarationList* declarations) {

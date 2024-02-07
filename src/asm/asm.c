@@ -9,7 +9,7 @@
 #define integer(i)   fprintf(out, "%d", i)
 #define floating(f)  fprintf(out, "%g", f);
 
-void print_literal(Literal literal, FILE* out) {
+static void print_literal(Literal literal, FILE* out) {
   match(literal) {
     of(IntLiteral, i) fprintf(out, "%d", *i);
     of(FloatLiteral, f) fprintf(out, "%g", *f);
@@ -18,7 +18,7 @@ void print_literal(Literal literal, FILE* out) {
   }
 }
 
-void print_type(Type type, FILE* out) {
+static void print_type(Type type, FILE* out) {
   match(type) {
     of(IntegerType) string(".int");
     of(FloatType) string(".float");
@@ -226,6 +226,7 @@ void write_storage(IntermediaryCode* code, FILE* out) {
       of(ICCall, name, dst) fprintf(out, "%s: .int 0\n", *dst);
       of(ICInput, type, dst) fprintf(out, "%s: .int 0\n", *dst);
       of(ICBinOp, operator, dst, left, right) fprintf(out, "%s: .int 0\n", *dst);
+      otherwise { }
     }
 
     code = code->next;
