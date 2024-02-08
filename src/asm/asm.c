@@ -122,8 +122,10 @@ void write_intermediary_code(IntermediaryCode* code, FILE* out) {
         fprintf(out, "mov %%r11d(%%r10d)\n, %s", *dst);
       }
       of(ICCall, name, dst) {
+        fprintf(out, "pushq %%rbp\n"); // Setup a stack frame
         fprintf(out, "callq %s\n", *name);
         fprintf(out, "mov %%eax, %s\n", *dst); // TODO: Is this enough? Maybe we need per-type return values?
+        fprintf(out, "popq %%rbp\n");
       }
       of(ICInput, type, dst) {
         char* format = NULL;
