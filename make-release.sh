@@ -1,6 +1,6 @@
 #!/bin/sh
 shopt -s globstar
-OUT=etapa5
+OUT=etapa6
 
 main() {
 	mkdir -p release/
@@ -23,7 +23,7 @@ default: build
 build:
 	flex lex.l
 	yacc -d grammar.y
-	gcc -I. *.c -o $OUT
+	clang -I. *.c -o $OUT
 
 clean:
 	rm $OUT
