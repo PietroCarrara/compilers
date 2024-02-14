@@ -12,6 +12,7 @@
 extern int yyparse(void);
 extern FILE* yyin;
 extern int yylineno;
+extern int has_error;
 
 Program yyprogram;
 
@@ -28,7 +29,6 @@ int main(int argc, char** argv) {
 
   // Parse and check for error
   if (yyparse()) {
-    printf("error: invalid syntax at file %s:%d\n", argv[1], yylineno);
     return 3;
   }
 
@@ -38,6 +38,11 @@ int main(int argc, char** argv) {
       printf("warning: %s\n", list->error.message);
       list = list->next;
     }
+    // return 4;
+  }
+
+  if (has_error != 0) {
+    return 3;
   }
 
   write_asm(yyprogram, stdout);

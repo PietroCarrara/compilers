@@ -5,13 +5,11 @@
   #include <string.h>
   #include <stdlib.h>
 
-  // Code required by the professor
-  // TODO: Delete
-  void initMe() { }
-  int _running = 1;
-  int yywrap(void) { _running = 0; return 1; }
-  int isRunning() { return _running; }
-  int getLineNumber() { return yylineno; }
+  int has_error = 0;
+
+  int yywrap(void) {
+    return 1;
+  }
 
   char* trim_quotes(char* str) {
     int size = strlen(str);
@@ -64,5 +62,6 @@
 %%
 
 void yyerror(char const *s) {
-  fprintf(stderr, "error: %s\n", s);
+  has_error = 1;
+  fprintf(stderr, "error: invalid syntax at line %d\n", yylineno);
 }

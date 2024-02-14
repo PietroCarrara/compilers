@@ -91,6 +91,8 @@
 program: declarations implementations { $$ = (Program){ .declarations = $1, .implementations = $2 }; yyprogram = $$; }
 
 declarations: declaration declarations { $$ = make_declaration($1); $$->next = $2; }
+            | error ';' declarations   { $$ = $3; }
+            | declarations ';' error   { $$ = $1; }
             |                          { $$ = NULL; }
             ;
 
@@ -110,6 +112,8 @@ array_declaration: type TOKEN_IDENTIFIER '[' TOKEN_INT_LITERAL ']' ';'          
                  ;
 
 implementations: implementation implementations { $$ = make_implementation_list($1); $$->next = $2; }
+               | error implementations          { $$ = $2; }
+               | implementations error          { $$ = $1; }
                |                                { $$ = NULL; }
                ;
 
@@ -124,6 +128,7 @@ command: TOKEN_IDENTIFIER '=' expression ';'                    { $$ = Assignmen
        | TOKEN_WHILE '(' expression ')' command                 { $$ = WhileStatement($3, make_statement($5)); }
        | '{' command_sequence '}'                               { $$ = BlockStatement($2); }
        | ';' /* Empty command */                                { $$ = EmptyStatement(); }
+       | command error ';'                                      { $$ = $1; }
        ;
 
 command_sequence: command command_sequence { $$ = make_statement_list($1); $$->next = $2; }
