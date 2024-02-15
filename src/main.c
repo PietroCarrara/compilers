@@ -23,7 +23,7 @@ int main(int argc, char** argv) {
 
   yyin = fopen(argv[1], "r");
   if (yyin == NULL) {
-    printf("error: could not open input file \"%s\": %s", argv[1], strerror(errno));
+    fprintf(stderr, "error: could not open input file \"%s\": %s", argv[1], strerror(errno));
     return 1;
   }
 
@@ -35,7 +35,7 @@ int main(int argc, char** argv) {
   SemanticErrorList* list = verify_program(yyprogram);
   if (list != NULL) {
     while (list != NULL) {
-      printf("warning: %s\n", list->error.message);
+      fprintf(stderr, "warning: %s\n", list->error.message);
       list = list->next;
     }
     // return 4;
@@ -45,7 +45,8 @@ int main(int argc, char** argv) {
     return 3;
   }
 
-  write_asm(yyprogram, stdout);
+  FILE* out = fopen("out.s", "w+");
+  write_asm(yyprogram, out);
 
   return 0;
 }

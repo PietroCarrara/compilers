@@ -2,6 +2,8 @@
 
 #include "intermediary-code.h"
 
+#include <string.h>
+
 #define space()      fprintf(out, " ")
 #define tabs(n)      fprintf(out, "%*s", (n)*TAB_SIZE, "")
 #define character(c) fprintf(out, "%c", c)
@@ -87,6 +89,57 @@ void write_string_literals(FILE* out) {
   }
 }
 
+int count_lines(FILE* out) {
+  int line_number = 0;
+
+  rewind(out);
+
+  char ch = fgetc(out);
+  while (!feof(out)) {
+    if (ch == '\n') {
+      line_number++;
+    }
+    ch = fgetc(out);
+  }
+
+  return line_number;
+}
+
+// Optimization to remember what value was inside each register and only load if necessary
+void write_mov(FILE* out, char* src, char* dst) {
+  // goto end; // Uncomment to turn off this optimization
+
+  static int last_instruction = -1;
+  int current_instruction = count_lines(out);
+
+  static char* last_src = NULL;
+  static char* last_dst = NULL;
+
+  // Assert we're the very next instruction
+  if (current_instruction - 1 != last_instruction) {
+    goto end;
+  }
+
+  // Assert there are available labels
+  if (last_src == NULL || last_dst == NULL) {
+    goto end;
+  }
+
+  // We're moving back and forth! No need to do it
+  if (strcmp(last_src, dst) == 0 && strcmp(last_dst, src) == 0) {
+    last_instruction = current_instruction;
+    last_src = src;
+    last_dst = dst;
+    return;
+  }
+
+end:
+  fprintf(out, "mov %s, %s\n", src, dst);
+  last_instruction = current_instruction;
+  last_src = src;
+  last_dst = dst;
+}
+
 void write_intermediary_code(IntermediaryCode* code, FILE* out) {
   while (code != NULL) {
     if (code->label != NULL) {
@@ -103,13 +156,13 @@ void write_intermediary_code(IntermediaryCode* code, FILE* out) {
       of(ICFunctionEnd) string("retq # Function end\n\n");
       of(ICJump, label) fprintf(out, "jmp %s\n", *label);
       of(ICJumpIfFalse, storage, label) {
-        fprintf(out, "mov %s, %%r10d\n", *storage);
+        write_mov(out, *storage, "%r10d");
         fprintf(out, "test %%r10d, %%r10d\n");
         fprintf(out, "je %s\n", *label);
       }
       of(ICCopy, dst, src) {
-        fprintf(out, "mov %s, %%r10d\n", *src);
-        fprintf(out, "mov %%r10d, %s\n", *dst);
+        write_mov(out, *src, "%r10d");
+        write_mov(out, "%r10d", *dst);
       }
       of(ICCopyAt, dst, idx, src) {
         fprintf(out, "mov $%s, %%r10d\n", *dst);
@@ -154,7 +207,7 @@ void write_intermediary_code(IntermediaryCode* code, FILE* out) {
         fprintf(out, "retq\n");
       }
       of(ICBinOp, operator, dst, left, right) {
-        fprintf(out, "mov %s, %%r10d\n", *left);
+        write_mov(out, *left, "%r10d");
 
         match(*operator) {
           of(SumOperator) fprintf(out, "add %s, %%r10d\n", *right);
@@ -214,7 +267,7 @@ void write_intermediary_code(IntermediaryCode* code, FILE* out) {
             fprintf(out, "mov %%eax, %%r10d\n");
           };
         }
-        fprintf(out, "mov %%r10d, %s\n", *dst);
+        write_mov(out, "%r10d", *dst);
       }
     }
 
