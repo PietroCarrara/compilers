@@ -1,6 +1,10 @@
 %{
+  #include <stdio.h>
   #include <stdlib.h>
   #include "syntax-tree.h"
+
+  extern int yylineno;
+  extern int has_error;
 
   int yylex(void);
   int yyerror(char* s);
@@ -91,14 +95,13 @@
 program: declarations implementations { $$ = (Program){ .declarations = $1, .implementations = $2 }; yyprogram = $$; }
 
 declarations: declaration declarations { $$ = make_declaration($1); $$->next = $2; }
-            | error ';' declarations   { $$ = $3; }
-            | declarations ';' error   { $$ = $1; }
             |                          { $$ = NULL; }
             ;
 
 declaration: variable_declaration
            | function_declaration
            | array_declaration
+           | error ';' { fprintf(stderr, "error: line %d: Invalid declaration\n", yylineno); yyerrok; }
            ;
 
 variable_declaration: type TOKEN_IDENTIFIER '=' literal ';' { $$ = VariableDeclaration($1, $2, $4); }
@@ -112,12 +115,12 @@ array_declaration: type TOKEN_IDENTIFIER '[' TOKEN_INT_LITERAL ']' ';'          
                  ;
 
 implementations: implementation implementations { $$ = make_implementation_list($1); $$->next = $2; }
-               | error implementations          { $$ = $2; }
-               | implementations error          { $$ = $1; }
                |                                { $$ = NULL; }
                ;
 
 implementation: TOKEN_CODE TOKEN_IDENTIFIER command { $$ = (Implementation){ .name = $2, .body = $3 }; }
+              | error { fprintf(stderr, "error: line %d: Invalid implementation\n", yylineno); }
+              ;
 
 command: TOKEN_IDENTIFIER '=' expression ';'                    { $$ = AssignmentStatement($1, $3); }
        | TOKEN_IDENTIFIER '[' expression ']' '=' expression ';' { $$ = ArrayAssignmentStatement($1, $3, $6); }
@@ -128,7 +131,8 @@ command: TOKEN_IDENTIFIER '=' expression ';'                    { $$ = Assignmen
        | TOKEN_WHILE '(' expression ')' command                 { $$ = WhileStatement($3, make_statement($5)); }
        | '{' command_sequence '}'                               { $$ = BlockStatement($2); }
        | ';' /* Empty command */                                { $$ = EmptyStatement(); }
-       | command error ';'                                      { $$ = $1; }
+       | TOKEN_IDENTIFIER '(' argument_list ')'                 { $$ = EmptyStatement(); fprintf(stderr, "error: line %d: Function call must be inside an expression (try discarding it's return value)\n", yylineno); has_error = 1; }
+       | error ';'                                              { $$ = EmptyStatement(); fprintf(stderr, "error: line %d: Invalid statement\n", yylineno); has_error = 1; }
        ;
 
 command_sequence: command command_sequence { $$ = make_statement_list($1); $$->next = $2; }

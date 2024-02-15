@@ -47,7 +47,7 @@
 
 [a-zA-Z_0-9]*[a-zA-Z_]+[a-zA-Z_0-9]* { yylval.identifier = strdup(yytext); return TOKEN_IDENTIFIER; }
 \"("\\\""|[^"\n])*\"                 { yylval.string_val = trim_quotes(yytext); return TOKEN_STRING_LITERAL; }
--?[0-9]+                             { yylval.int_val = atoi(yytext); return TOKEN_INT_LITERAL; }
+[0-9]+                             { yylval.int_val = atoi(yytext); return TOKEN_INT_LITERAL; }
 [0-9]+\.[0-9]+                       { yylval.float_val = atof(yytext); return TOKEN_FLOAT_LITERAL; }
 '.'                                  { yylval.char_val = yytext[1]; return TOKEN_CHAR_LITERAL; }
 
@@ -63,5 +63,5 @@
 
 void yyerror(char const *s) {
   has_error = 1;
-  fprintf(stderr, "error: invalid syntax at line %d\n", yylineno);
+  /* fprintf(stderr, "error at line %d\n", yylineno); */
 }
